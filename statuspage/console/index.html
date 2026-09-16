@@ -42,13 +42,17 @@
 
   <section class="list" aria-label="Conversations">
     <div class="list-head">
-      <h2 id="queue-name">Inbox</h2>
-      <span class="ct" id="queue-count"></span>
-      <span class="spacer"></span>
-      <button class="chip" id="f-todo" aria-pressed="false">To do</button>
-      <button class="chip" id="f-progress" aria-pressed="false">In progress</button>
-      <button class="chip" id="f-unread" aria-pressed="false">Unread</button>
-      <button class="chip" id="f-urgent" aria-pressed="false">Urgent</button>
+      <div class="list-head-top">
+        <h2 id="queue-name">All open</h2>
+        <span class="ct" id="queue-count"></span>
+      </div>
+      <div class="filters" role="group" aria-label="Filters">
+        <button class="chip" id="f-todo" aria-pressed="false">To do</button>
+        <button class="chip" id="f-progress" aria-pressed="false">In progress</button>
+        <button class="chip" id="f-waiting" aria-pressed="false">Waiting</button>
+        <button class="chip" id="f-unread" aria-pressed="false">Unread</button>
+        <button class="chip" id="f-urgent" aria-pressed="false">Urgent</button>
+      </div>
     </div>
     <div class="list-body" id="list" role="list"></div>
   </section>

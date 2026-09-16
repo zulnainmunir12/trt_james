@@ -692,17 +692,21 @@
     render();
   });
 
-  function stageChip(id, key) {
+  var STAGE_CHIPS = { "f-todo": "todo", "f-progress": "progress", "f-waiting": "waiting" };
+  function syncStageChips() {
+    Object.keys(STAGE_CHIPS).forEach(function (id) {
+      $(id).setAttribute("aria-pressed", state.stage === STAGE_CHIPS[id]);
+    });
+  }
+  Object.keys(STAGE_CHIPS).forEach(function (id) {
     $(id).onclick = function () {
       // Mutually exclusive: two stage filters at once would always be empty.
+      var key = STAGE_CHIPS[id];
       state.stage = state.stage === key ? null : key;
-      $("f-todo").setAttribute("aria-pressed", state.stage === "todo");
-      $("f-progress").setAttribute("aria-pressed", state.stage === "progress");
+      syncStageChips();
       renderList();
     };
-  }
-  stageChip("f-todo", "todo");
-  stageChip("f-progress", "progress");
+  });
 
   $("f-unread").onclick = function () {
     state.unreadOnly = !state.unreadOnly;
