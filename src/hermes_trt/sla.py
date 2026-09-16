@@ -25,6 +25,10 @@ class SLAStatus(str, Enum):
     DONE = "done"            # completed, no longer tracked
 
 
+#: Marks a source string as our invention rather than the client's policy.
+PROVISIONAL_MARKER = "PROVISIONAL"
+
+
 @dataclass(frozen=True)
 class SLARule:
     """A deadline that starts from some event and warns before it lands."""
@@ -36,6 +40,20 @@ class SLARule:
     trigger: str              # the event the clock starts from
     source: str               # where this rule came from - keep it checkable
     escalate_to: str = "leadership"
+
+    #: True when WE chose the number because the client has not defined it.
+    #: Structural rather than a comment on purpose: invented numbers have a
+    #: way of quietly becoming agreed numbers once someone has seen a demo.
+    #: `assert_no_provisional_rules()` is the gate that stops that.
+    provisional: bool = False
+
+    def __post_init__(self) -> None:
+        if self.provisional and PROVISIONAL_MARKER not in self.source:
+            raise ValueError(
+                f"Rule {self.key!r} is provisional but its source does not say so. "
+                f"Start the source with {PROVISIONAL_MARKER} so it is obvious "
+                f"in every report and log line."
+            )
 
     def due_date(self, trigger_date: date) -> date:
         return trigger_date + timedelta(days=self.days_from_trigger)
@@ -91,6 +109,72 @@ RULES: dict[str, SLARule] = {
     ),
 }
 
+#: Operational response targets - how fast a ticket should be picked up.
+#:
+#: THE CLIENT HAS NOT DEFINED THESE. The numbers below are ours, chosen so
+#: the pipeline has something to run against during development. They are
+#: not a proposal and must not be shown to the client as agreed terms.
+#:
+#: Replace when they answer the question in docs/OPEN-QUESTIONS.md.
+PROVISIONAL_RULES: dict[str, SLARule] = {
+    "physician_response": SLARule(
+        key="physician_response",
+        label="Physician responds to a clinical ticket",
+        days_from_trigger=2,
+        warn_days_before=1,
+        trigger="ticket_created",
+        source=f"{PROVISIONAL_MARKER} - our placeholder. Client has not "
+               f"defined a physician response target.",
+        provisional=True,
+    ),
+    "nursing_response": SLARule(
+        key="nursing_response",
+        label="Nursing responds to a client consultation",
+        days_from_trigger=2,
+        warn_days_before=1,
+        trigger="ticket_created",
+        source=f"{PROVISIONAL_MARKER} - our placeholder. Client has not "
+               f"defined a nursing response target.",
+        provisional=True,
+    ),
+    "support_response": SLARule(
+        key="support_response",
+        label="Support responds to an administrative ticket",
+        days_from_trigger=3,
+        warn_days_before=1,
+        trigger="ticket_created",
+        source=f"{PROVISIONAL_MARKER} - our placeholder. Client has not "
+               f"defined a support response target.",
+        provisional=True,
+    ),
+}
+
+#: Everything the tracker can use. Provisional rules are included so the
+#: pipeline works end to end, and excluded from production by the gate below.
+ALL_RULES: dict[str, SLARule] = {**RULES, **PROVISIONAL_RULES}
+
+
+def provisional_rule_keys() -> list[str]:
+    """Rules whose numbers we invented. Should be empty before go-live."""
+    return sorted(k for k, r in ALL_RULES.items() if r.provisional)
+
+
+def assert_no_provisional_rules() -> None:
+    """Fail loudly if an invented deadline would reach production.
+
+    Call this from deployment checks. A placeholder that ships is worse
+    than a missing rule: it looks like an agreed commitment.
+    """
+    offenders = provisional_rule_keys()
+    if offenders:
+        raise RuntimeError(
+            "Provisional SLA rules are still present and must not ship: "
+            + ", ".join(offenders)
+            + ". These numbers were chosen by us, not the client. "
+              "See docs/OPEN-QUESTIONS.md."
+        )
+
+
 #: Membership terms other than quarterly. Kept separate from RULES because
 #: the renewal interval depends on which plan the client is on.
 MEMBERSHIP_TERM_DAYS = {"quarter": 90, "six": 182, "annual": 365}
@@ -111,7 +195,7 @@ class Deadline:
 
     @property
     def rule(self) -> SLARule:
-        return RULES[self.rule_key]
+        return ALL_RULES[self.rule_key]
 
     def status(self, today: Optional[date] = None) -> SLAStatus:
         if self.completed:
@@ -147,7 +231,7 @@ def build_deadline(
     `term` applies only to membership rules, where the interval depends on
     the plan the client chose.
     """
-    rule = RULES[rule_key]
+    rule = ALL_RULES[rule_key]
     if term and rule_key == "membership_renewal":
         if term not in MEMBERSHIP_TERM_DAYS:
             raise ValueError(
