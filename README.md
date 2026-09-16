@@ -16,11 +16,13 @@ clinical or discretionary judgement routes to a qualified human. See
 | Hermes Agent runtime | ✅ Installed and verified (v0.21.3) |
 | Model provider | ✅ Google Gemini, `gemini-3.6-flash` |
 | Tool calling | ✅ Verified |
-| Slack ingestion | ⬜ Not started |
-| Email ingestion | ⬜ Not started |
-| Ticketing system | ⬜ Not started — must be built |
-| SLA tracking + escalation | ⬜ Not started — must be built |
-| HubSpot integration | ⬜ Not started |
+| Scheduler (cron) | ✅ Verified firing |
+| Gateway | ✅ Runs; no platforms connected yet |
+| Ticketing substrate | ✅ **Native kanban board — no need to build one** |
+| Slack ingestion | ⬜ Needs a bot token |
+| Email ingestion | ⬜ Needs a dedicated mailbox |
+| **SLA tracking + escalation** | ⬜ **Not started — this is the real build** |
+| HubSpot integration | ⬜ Needs a private app token |
 
 Nothing is connected to any real client system. All work so far is local,
 against dummy data.

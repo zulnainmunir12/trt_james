@@ -124,3 +124,28 @@ Not applicable to the client's real Linux server.
 | `reasoning_effort` | `low` |
 
 Both smoke tests pass: plain generation, and tool calling.
+
+## 6. SQLite must be 3.51.3+ on the production server
+
+The gateway warns on every database:
+
+> linked SQLite 3.45.1 is vulnerable to the WAL-reset corruption bug — using
+> journal_mode=DELETE instead of enabling WAL. Upgrade to SQLite 3.51.3+
+> (or backports 3.50.7 / 3.44.6)
+
+Hermes protects itself by disabling WAL, so it is not unsafe — but
+`journal_mode=DELETE` is materially slower under concurrent writes, and every
+ticket, comment and audit event goes through SQLite.
+
+**Ubuntu 24.04 ships 3.45.1**, so this is not a WSL artefact. It will recur on
+the client's server. For a system holding health records with immutable audit
+logs, resolve it before go-live.
+
+## 7. The gateway is the scheduler
+
+`hermes cron` jobs only fire while `hermes gateway run` is alive. On the
+client's server the gateway must be a supervised systemd service, or the
+monthly check-in and daily pathology monitor silently stop running.
+
+Related: cron scripts must live in `~/.hermes/scripts/` and be referenced by
+**filename only**. Absolute paths are rejected.

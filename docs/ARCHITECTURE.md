@@ -74,22 +74,29 @@ is the ticketing and SLA layer, and it is ours to build.
 | Email ingestion | Connect — Hermes has an IMAP/SMTP gateway |
 | Scheduler | Use — Hermes has a built-in cron |
 | Persistent memory | Use — Hermes has session memory |
-| **Ticketing system** | **Build or self-host** — client has nothing |
-| **SLA tracking + escalation** | **Build** — client has nothing |
+| Ticketing store | **Use** — Hermes has a native kanban board (verified) |
+| **SLA tracking + escalation** | **Build** — the board has no due-date concept |
 | HubSpot integration | Build — client has HubSpot, it has a REST API |
 | Booking | **Do not build** — Simply Schedule Appointments already exposes 112 REST routes |
 
-### On ticketing
+### On ticketing — resolved
 
-Writing a ticketing system from scratch is weeks of CRUD and staff UI, and
-none of it is what makes this project valuable. Since APP compliance pushes us
-to self-host anyway, self-hosting an open-source helpdesk and pointing Hermes
-at its API is worth evaluating first.
+We planned to build or self-host a ticketing system. **Testing showed Hermes
+already has one.** Its kanban board is a durable SQLite store with
+create/assign/comment/complete/block, file attachments, an audit trail, stale
+reclaim, and — most usefully — `--triage` (park when unsure) and
+`--idempotency-key` (never raise the same ticket twice).
 
-- **FreeScout** — email-first, which matches how this clinic actually works; PHP, sits beside their existing WordPress stack
-- **Zammad** — heavier, more featureful
+See [HERMES-CAPABILITIES.md](HERMES-CAPABILITIES.md) for what was verified.
 
-Decision not yet made. Build-vs-buy should be a deliberate call, not a default.
+**What it lacks is exactly our domain: deadlines.** There is no due-date
+field. So the build narrows to the SLA layer — due dates, pre-expiry warnings,
+escalation to leadership — which is the client-specific part anyway (8-week
+follow-up, 4-month result expiry, renewal dates).
+
+One open question for the client: **staff need somewhere to look at their
+work.** The board is CLI and agent-facing. If they want a web UI, that is
+either a small internal app or a reason to revisit FreeScout.
 
 ## Attachment handling
 
