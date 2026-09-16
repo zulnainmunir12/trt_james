@@ -697,3 +697,8 @@ body {
   padding: 14px 18px 8px; background: var(--raised);
   border-bottom: 1px solid var(--line);
 }
+
+/* Hero line: numbers and names carry the weight, the connective text
+   recedes. Bolding the actionable words is what makes it scannable. */
+.ov-hero p { font-size: 15px; line-height: 1.62; color: rgba(255,255,255,.78); }
+.ov-hero p b { color: #fff; font-weight: 600; }

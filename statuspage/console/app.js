@@ -619,6 +619,36 @@
 
   /* ======================================================== overview */
 
+  // The hero line should tell you what to DO, not that something happened.
+  // It names the most pressing item rather than counting abstractly, because
+  // "1 item was held back" sends you hunting for which one.
+  function heroLine(open, routed, held, late) {
+    var b = function (t) { return '<b>' + esc(t) + "</b>"; };
+    var parts = [];
+
+    parts.push(b(open + (open === 1 ? " request" : " requests")) +
+      " came in, " + b(routed + " sorted automatically") + ".");
+
+    // Name the single most pressing thing. One clear instruction beats a
+    // list of counts nobody reads.
+    if (held) {
+      var one = DATA.filter(function (m) { return m.route === "held"; })[0];
+      parts.push(one
+        ? "Needs your judgement: " + b(one.from) + " — " + esc(one.subject.toLowerCase()) + "."
+        : b(held + " held for review") + ".");
+    }
+    if (late.length) {
+      var c = late[0];
+      parts.push(b(c.name + "'s " + c.next.toLowerCase()) + " is " +
+        b(Math.abs(c.due) + (Math.abs(c.due) === 1 ? " day" : " days") + " past due") +
+        (late.length > 1 ? ", plus " + (late.length - 1) + " more" : "") + ".");
+    }
+    if (!held && !late.length) {
+      parts.push("Nothing is waiting on you and nothing is past its target date.");
+    }
+    return parts.join(" ");
+  }
+
   function renderOverview() {
     var pane = $("pane");
     document.querySelector(".app").classList.add("wide");
@@ -661,9 +691,7 @@
     pane.innerHTML =
       '<div class="ov-body">' +
       '<div class="ov-hero"><h1>' + greet + ", Alex</h1>" +
-      "<p>Everything that came in has been read and sorted. " +
-      (held ? "One item was held back for a person to look at."
-            : "Nothing needed a person's judgement today.") + "</p>" +
+      "<p>" + heroLine(open, routed, held, late) + "</p>" +
       '<div class="hero-meta">' +
         '<span class="hm"><span class="hmn">' + routed + '</span>' +
         '<span class="hml">routed automatically</span></span>' +
