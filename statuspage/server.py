@@ -303,21 +303,70 @@ no controls, no configuration, no client data.</p>
 </div></body></html>"""
 
 
+CONSOLE_DIR = Path(__file__).resolve().parent / "console"
+
+#: Only these files are servable. An allowlist rather than path arithmetic:
+#: this is going behind a public URL, and a traversal bug here would expose
+#: the filesystem.
+STATIC = {
+    "/": ("index.html", "text/html; charset=utf-8"),
+    "/index.html": ("index.html", "text/html; charset=utf-8"),
+    "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+}
+
+
+def api_state() -> dict:
+    """Everything the console renders from the running system."""
+    return {
+        "gateway": gateway_up(),
+        "tickets": tickets(),
+        "deadlines": deadlines(),
+        "rules": sla_rules(),
+        "cron": cron_jobs(),
+        "safety": safety_flags(),
+        "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802
-        if self.path.startswith("/health"):
-            body = json.dumps({"ok": True, "gateway": gateway_up()}).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-        else:
-            body = render().encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+    def _send(self, body: bytes, content_type: str, status: int = 200) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802
+        path = self.path.split("?", 1)[0]
+
+        if path.startswith("/health"):
+            self._send(json.dumps({"ok": True, "gateway": gateway_up()}).encode(),
+                       "application/json")
+            return
+
+        if path.startswith("/api/state"):
+            self._send(json.dumps(api_state(), default=str).encode(),
+                       "application/json")
+            return
+
+        if path == "/status":          # the plain summary page, kept as a fallback
+            self._send(render().encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        entry = STATIC.get(path)
+        if entry:
+            filename, content_type = entry
+            try:
+                self._send((CONSOLE_DIR / filename).read_bytes(), content_type)
+            except OSError:
+                self._send(b"Not found", "text/plain; charset=utf-8", 404)
+            return
+
+        self._send(b"Not found", "text/plain; charset=utf-8", 404)
 
     def do_POST(self) -> None:  # noqa: N802
         # Read-only by design: nothing here should ever accept input.
