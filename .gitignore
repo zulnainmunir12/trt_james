@@ -1,0 +1,31 @@
+# Secrets — never commit. API keys live in ~/.hermes/.env on the machine,
+# and in the client's secret store in production.
+.env
+*.env
+!.env.example
+secrets/
+*.key
+*.pem
+
+# Hermes runtime state (lives in ~/.hermes, not here — this is a guard
+# in case anyone copies it in).
+sessions/
+logs/
+*.sqlite
+*.sqlite3
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

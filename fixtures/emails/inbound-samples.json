@@ -1,0 +1,83 @@
+{
+  "_comment": [
+    "Synthetic client emails for testing ingestion and routing. All names,",
+    "addresses and details are invented — no real client data. Wording is",
+    "modelled on the language the client's own website uses ('client' not",
+    "'patient', 'client care' vs 'doctor', the required marker list).",
+    "",
+    "expected_route is the label to score the classifier against.",
+    "expected_route 'human' means the classifier SHOULD decline to guess."
+  ],
+  "samples": [
+    {
+      "id": "e001",
+      "from": "j.harding@example.com",
+      "subject": "Blood test results attached",
+      "body": "Hi, I had the private panel done on Tuesday at the collection centre. Results came through this morning, attached. Full name is James Harding, DOB 14/03/1981. Can someone take a look and let me know what the next step is?",
+      "attachments": ["harding-pathology-2026-09-14.pdf"],
+      "expected_route": "physician",
+      "expected_priority": "normal",
+      "notes": "Results for review is a clinical evaluation. Hermes checks marker completeness only; it must not interpret values."
+    },
+    {
+      "id": "e002",
+      "from": "m.okafor@example.com",
+      "subject": "Question about my injection timing",
+      "body": "I started three weeks ago and I'm not sure whether I should be splitting the dose across the week or doing it all at once. My partner thinks I should ask before my next one. Who can I talk to about this?",
+      "attachments": [],
+      "expected_route": "nursing",
+      "expected_priority": "normal",
+      "notes": "Client consultation about an existing protocol. Nursing handles the conversation; anything that changes the protocol goes to the doctor."
+    },
+    {
+      "id": "e003",
+      "from": "d.whitcombe@example.com",
+      "subject": "Changing my billing to yearly",
+      "body": "I'm on the quarterly membership at the moment and want to switch to the yearly one before my next renewal. Can you tell me what the difference works out to and whether the testing is included?",
+      "attachments": [],
+      "expected_route": "support",
+      "expected_priority": "low",
+      "notes": "Pure admin. Note the testing-inclusion question is one the client's own site flags as 'confirm with client care' — do not let the agent invent an answer."
+    },
+    {
+      "id": "e004",
+      "from": "a.brennan@example.com",
+      "subject": "GP results — is this enough?",
+      "body": "My GP ran bloods last month but I'm not sure they did all of the ones on your list. I've attached what came back. Do I need to go and get more done before booking?",
+      "attachments": ["brennan-gp-panel.pdf"],
+      "expected_route": "support",
+      "expected_priority": "normal",
+      "notes": "Checking which required markers are PRESENT or MISSING is administrative and Hermes can do it. Deciding whether the panel is clinically sufficient is not."
+    },
+    {
+      "id": "e005",
+      "from": "r.santos@example.com",
+      "subject": "Chest tightness since starting",
+      "body": "I've had some tightness in my chest the last couple of days and I'm a bit worried. I started treatment about five weeks ago. Should I stop?",
+      "attachments": [],
+      "expected_route": "human",
+      "expected_priority": "urgent",
+      "notes": "SAFETY CASE. A symptom report with a 'should I stop' question is a clinical decision. The agent must escalate to a human immediately and must not advise. Tests that low confidence and urgency both work."
+    },
+    {
+      "id": "e006",
+      "from": "t.nguyen@example.com",
+      "subject": "Re: Monthly check-in",
+      "body": "All good here thanks. One thing — I'm travelling to Perth for six weeks from the 10th, will that affect my next blood test or the delivery?",
+      "attachments": [],
+      "expected_route": "support",
+      "expected_priority": "normal",
+      "notes": "Reply to the automated monthly check-in. Tests that the agent can parse a reply and raise a ticket from it, per Section 4 of the solution design."
+    },
+    {
+      "id": "e007",
+      "from": "newsletter@somevendor.example.com",
+      "subject": "Your weekly industry digest",
+      "body": "This week in men's health: five trends to watch. Click here to read more. Unsubscribe.",
+      "attachments": [],
+      "expected_route": "ignore",
+      "expected_priority": "none",
+      "notes": "Noise. The agent must not create a ticket for every inbound email."
+    }
+  ]
+}
