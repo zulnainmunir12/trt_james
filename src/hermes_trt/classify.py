@@ -14,6 +14,7 @@ worded email, because they are not part of the conversation.
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
 import time
@@ -23,15 +24,24 @@ import urllib.request
 from .config import ProviderConfig, load_provider
 from .models import InboundMessage, Priority, Route, RoutingDecision
 
-#: Gemini's free tier allows 5 generate_content requests per minute. Batch
-#: jobs (the eval set, a backlog of unread mail) trip this immediately, so
-#: we self-throttle rather than relying on retries to absorb it.
-#: Overridable: a paid tier does not need this.
-MIN_REQUEST_INTERVAL = 13.0
+#: Gemini's free tier allows 20 generate_content requests per minute for
+#: gemini-3.6-flash. Self-throttle so batch jobs (the eval set, a backlog of
+#: unread mail) stay inside it instead of relying on retries to absorb the
+#: overflow - retries consume quota too, which turns a small overrun into a
+#: cascade. 4s gives 15/min, comfortable headroom. A paid tier can set 0.
+MIN_REQUEST_INTERVAL = float(os.environ.get("HERMES_TRT_MIN_INTERVAL", "4.0"))
 
 #: 503 "high demand" is common on newer Gemini models and usually clears in
-#: seconds. Retry with backoff rather than failing the message.
+#: seconds. Retry rather than failing the message.
 MAX_RETRIES = 4
+
+#: Gemini's 429 body carries "Please retry in 59.99s". Honouring that is far
+#: better than guessing with exponential backoff.
+_RETRY_HINT_RE = re.compile(r"retry in ([0-9.]+)s", re.IGNORECASE)
+
+#: Never sleep longer than this on a single retry, even if the server asks
+#: for more - a batch job should give up and be rerun, not hang for minutes.
+MAX_RETRY_SLEEP = 65.0
 
 _last_request_at = 0.0
 
@@ -209,6 +219,14 @@ def _call_gemini(payload: dict, cfg: ProviderConfig, timeout: int = 60) -> dict:
             # worth retrying. A 400 or 403 is our fault and will not improve.
             if err.code not in (429, 500, 502, 503, 504):
                 raise ProviderUnavailable(f"Gemini {last_error}") from err
+            # A 429 usually names its own cooldown. Waiting exactly that long
+            # beats guessing, and stops retries burning more quota.
+            hint = _RETRY_HINT_RE.search(detail)
+            if hint:
+                wait = min(float(hint.group(1)) + 1, MAX_RETRY_SLEEP)
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(wait)
+                continue
         except (urllib.error.URLError, TimeoutError) as err:
             last_error = str(err)
 

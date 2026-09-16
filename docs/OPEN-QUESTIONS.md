@@ -30,6 +30,43 @@ What we still need, and what each one blocks. Ordered by how much it holds up.
 | 9 | **Where Hermes gets hosted** — their server or private cloud | We committed to self-hosting |
 | 10 | **Message volume estimate** | Determines LLM cost. We will not quote a figure without it |
 
+## Routing boundary the classifier surfaced
+
+Testing threw up a real domain question we cannot answer ourselves.
+
+**Fixture `e002`:** a client three weeks into treatment asks whether to split
+their dose across the week or take it all at once.
+
+We labelled it `nursing`. **The classifier is not stable on it** — across two
+runs of the identical input at `temperature: 0.0` it returned:
+
+| Run | Route | Confidence | Model's reasoning |
+|---|---|---|---|
+| 1 | `human` | 0.95 | "asking whether to change their treatment protocol" |
+| 2 | `nursing` | 0.90 | (routed as expected) |
+
+Two things follow.
+
+**1. Temperature 0 does not guarantee determinism.** Worth knowing before we
+quote any routing-accuracy figure to the client — a single run is not a
+measurement. Accuracy claims need repeated runs, and the eval harness should
+grow a `--repeat` flag.
+
+**2. This is a genuine boundary case**, and the model's instability is
+evidence of that rather than a bug. Dosing schedule is arguably a prescribing
+decision, not a nursing consultation — a nurse probably should not be telling
+a client how to split a testosterone dose.
+
+We have deliberately **not** changed the fixture to match the output. Editing
+a test so it passes would destroy the value of the eval set.
+
+**Question for the client:** where does "how do I take my dose" sit? Can
+nursing answer protocol questions, or does anything touching dose, timing or
+frequency go to the prescribing doctor?
+
+This is the boundary the whole routing design hangs on, and it needs their
+answer rather than our assumption.
+
 ## Needs confirming
 
 | # | Item | Note |
