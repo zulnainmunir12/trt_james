@@ -68,6 +68,46 @@ def test_telemetry_is_off():
     )
 
 
+def profile_configs() -> list[tuple[str, Path]]:
+    """Every profile's config, including the default."""
+    configs = [("default", CONFIG)]
+    profiles_dir = CONFIG.parent / "profiles"
+    if profiles_dir.is_dir():
+        configs += [
+            (d.name, d / "config.yaml")
+            for d in sorted(profiles_dir.iterdir())
+            if (d / "config.yaml").exists()
+        ]
+    return configs
+
+
+def test_every_profile_has_dispatch_disabled():
+    """`profile create --clone` inherits our hardened config, but a profile
+    made any other way gets Hermes' defaults - which are autonomous.
+
+    Each role profile is an assignee on the board. If one could dispatch,
+    assigning a clinical ticket to 'physician' would spawn an agent to do
+    the clinical work. That is the incident, through the back door.
+    """
+    unsafe = []
+    for name, path in profile_configs():
+        text = path.read_text(encoding="utf-8")
+        dispatch = re.search(r"dispatch_in_gateway:\s*(\w+)", text)
+        decompose = re.search(r"auto_decompose:\s*(\w+)", text)
+        if not dispatch or dispatch.group(1) != "false":
+            unsafe.append(f"{name}: dispatch_in_gateway="
+                          f"{dispatch.group(1) if dispatch else 'UNSET'}")
+        if not decompose or decompose.group(1) != "false":
+            unsafe.append(f"{name}: auto_decompose="
+                          f"{decompose.group(1) if decompose else 'UNSET'}")
+
+    assert not unsafe, (
+        "These profiles can dispatch autonomously: " + "; ".join(unsafe)
+        + ". Run setup/disable-auto-orchestration.sh, then "
+          "setup/audit-profile-safety.sh"
+    )
+
+
 def test_config_records_why_dispatch_is_off():
     """A future maintainer flipping this back should see the reason first.
 

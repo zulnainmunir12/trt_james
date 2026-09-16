@@ -24,15 +24,28 @@ HERMES_BIN = Path(
     os.environ.get("HERMES_BIN", Path.home() / ".local" / "bin" / "hermes")
 )
 
-#: Which kanban assignee handles each route. These are profile names; until
-#: the client gives us their staff roster these are placeholders and the
-#: tickets land unassigned in triage.
+#: Which kanban assignee handles each route.
+#:
+#: These are Hermes profiles created by setup/create-profiles.sh, and they
+#: are ROUTING LABELS - a way to show on the board who owns a ticket. They
+#: are not autonomous workers: the kanban dispatcher that would spawn an
+#: agent per assignee is disabled (docs/INCIDENT-auto-decomposer.md), and
+#: setup/audit-profile-safety.sh checks it stays that way.
+#:
+#: Real staff names replace these once the client supplies their roster -
+#: see docs/OPEN-QUESTIONS.md #5.
 ROUTE_ASSIGNEES: dict[Route, Optional[str]] = {
-    Route.PHYSICIAN: None,   # awaiting real profiles - see OPEN-QUESTIONS #5
-    Route.NURSING: None,
-    Route.SUPPORT: None,
+    Route.PHYSICIAN: "physician",
+    Route.NURSING: "nursing",
+    Route.SUPPORT: "support",
+    # HUMAN is deliberately unassigned: it goes to kanban triage, where a
+    # person decides who should own it. Assigning it would imply someone
+    # has already accepted it.
     Route.HUMAN: None,
 }
+
+#: Where SLA escalations go when a ticket goes overdue.
+ESCALATION_ASSIGNEE = "leadership"
 
 #: The SLA rule that starts ticking when a ticket of each route is created.
 ROUTE_RESPONSE_RULE: dict[Route, str] = {
