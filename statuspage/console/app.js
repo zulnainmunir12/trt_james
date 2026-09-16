@@ -28,7 +28,10 @@
     filter: '<path d="M22 3H2l8 9.5V19l4 2v-8.5z"/>',
     reply: '<path d="M9 17 4 12l5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>',
     clip: '<path d="M21.4 11.1 12.3 20a5 5 0 0 1-7-7l9-9a3.3 3.3 0 0 1 4.7 4.7l-9 9a1.7 1.7 0 0 1-2.3-2.3l8.3-8.3"/>',
-    back: '<path d="M19 12H5M12 19l-7-7 7-7"/>'
+    back: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+    repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+    flask: '<path d="M9 3h6M10 3v6L5 19a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 19l-5-10V3"/><path d="M7.5 14h9"/>'
   };
   function svg(d, cls) {
     return '<svg class="' + (cls || "") + '" viewBox="0 0 24 24" fill="none" ' +
@@ -170,6 +173,9 @@
       test: function (m) { return m.channel === "email"; } },
     { id: "slack",     name: "Internal chat", icon: I.hash,
       test: function (m) { return m.channel === "slack"; } },
+    { sep: "Scheduled" },
+    { id: "schedule",  name: "Schedule",      icon: I.calendar, wide: true,
+      test: function () { return true; } },
     { sep: "Other" },
     { id: "filtered",  name: "Filtered out",  icon: I.filter, source: "filtered",
       test: function () { return true; } },
@@ -364,7 +370,152 @@
     if (!closed) $("a-done").onclick = markDone;
   }
 
-  function render() { renderRail(); renderList(); renderPane(); }
+  function render() {
+    renderRail();
+    if (state.queue === "schedule") { renderSchedule(); return; }
+    document.querySelector(".app").classList.remove("wide");
+    renderList();
+    renderPane();
+  }
+
+
+  /* -------------------------------------------------------- schedule */
+
+  // Populated from /api/state — the actual cron services running behind
+  // the product. Falls back to the configured intervals if unreachable.
+  var CRON = { pathology: null, checkin: null };
+
+  // Upcoming obligations per client. Dates are relative to today so the
+  // view never looks stale during a demonstration.
+  function scheduleDays() {
+    var today = new Date();
+    function on(offset) {
+      var d = new Date(today); d.setDate(d.getDate() + offset); return d;
+    }
+    function label(d, offset) {
+      if (offset === 0) return "Today";
+      if (offset === 1) return "Tomorrow";
+      return d.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "short" });
+    }
+    var plan = [
+      [0, [
+        ["09:00", "Pathology monitoring", "Daily sweep of follow-up and expiry dates", "routine", null],
+        ["—", "Priya Sharma", "Follow-up bloods · overdue by 2 days", "overdue", "nursing"],
+        ["—", "Michael Reed", "Monthly check-in email due", "checkin", "support"]
+      ]],
+      [1, [
+        ["09:00", "Pathology monitoring", "Daily sweep", "routine", null],
+        ["—", "Daniel Whitcombe", "Membership renewal reminder", "renewal", "support"]
+      ]],
+      [3, [
+        ["09:00", "Pathology monitoring", "Daily sweep", "routine", null],
+        ["—", "Amara Brennan", "Eligibility review follow-up", "followup", "support"]
+      ]],
+      [9, [
+        ["09:00", "Pathology monitoring", "Daily sweep", "routine", null],
+        ["—", "Tom Nguyen", "Blood results expire in 21 days", "expiry", "physician"],
+        ["—", "Rachel Santos", "Monthly check-in email due", "checkin", "support"]
+      ]],
+      [13, [
+        ["—", "Michael Reed", "Follow-up bloods due — 8 weeks from treatment start", "due", "physician"]
+      ]]
+    ];
+    return plan.map(function (p) {
+      var d = on(p[0]);
+      return { date: d, offset: p[0], label: label(d, p[0]), events: p[1] };
+    });
+  }
+
+  var EV_TAG = {
+    routine:  ["Automated", "mute"],
+    overdue:  ["Overdue", "urgent"],
+    due:      ["Due", "warn"],
+    checkin:  ["Check-in", "support"],
+    renewal:  ["Renewal", "mute"],
+    expiry:   ["Expiring", "warn"],
+    followup: ["Follow-up", "mute"]
+  };
+
+  function renderSchedule() {
+    var pane = $("pane");
+    document.querySelector(".app").classList.add("wide");
+    pane.classList.add("open");
+
+    var days = scheduleDays();
+
+    var routines =
+      '<div class="routines">' +
+        '<article class="routine"><div class="routine-top">' +
+          '<span class="routine-ico">' + svg(I.flask) + "</span><span>" +
+          "<h3>Pathology monitoring</h3>" +
+          '<div class="rsub">Checks every client for follow-up bloods due, ' +
+          "results expiring and overdue obligations.</div></span></div>" +
+          '<div class="rwhen"><span class="rk">Runs</span>' +
+          '<span class="rv" id="cron-path">Daily · 09:00</span></div>' +
+          '<div class="steps">' +
+            '<div class="step"><div class="st">Sweep</div><div class="sd">Every tracked obligation</div></div>' +
+            '<div class="step"><div class="st">Compare</div><div class="sd">Against target dates</div></div>' +
+            '<div class="step"><div class="st">Alert</div><div class="sd">Before a date is missed</div></div>' +
+          "</div>" +
+          '<div style="font-size:11.5px;color:var(--dimmer);margin-top:10px" id="cron-next">&nbsp;</div>' +
+        "</article>" +
+
+        '<article class="routine"><div class="routine-top">' +
+          '<span class="routine-ico">' + svg(I.repeat) + "</span><span>" +
+          "<h3>Client check-in</h3>" +
+          '<div class="rsub">Sends each client a status email, reads the reply ' +
+          "and raises the right task from it.</div></span></div>" +
+          '<div class="rwhen"><span class="rk">Runs</span>' +
+          '<span class="rv">Monthly</span></div>' +
+          '<div class="steps">' +
+            '<div class="step dim"><div class="st">Send</div><div class="sd">Templated status email</div></div>' +
+            '<div class="step dim"><div class="st">Read reply</div><div class="sd">Understand the response</div></div>' +
+            '<div class="step dim"><div class="st">Raise task</div><div class="sd">Route to the right queue</div></div>' +
+          "</div>" +
+          '<div style="font-size:11.5px;color:var(--dimmer);margin-top:10px">' +
+          "Not yet switched on — awaiting approved email wording.</div>" +
+        "</article>" +
+      "</div>";
+
+    var timeline = days.map(function (d) {
+      var alert = d.events.some(function (e) { return e[3] === "overdue"; });
+      return '<div class="day-head"><span class="dd">' + esc(d.label) + "</span>" +
+        '<span class="dn">' + d.events.length +
+        (d.events.length === 1 ? " item" : " items") + "</span>" +
+        (alert ? '<span class="dtag">' + tag("Needs attention", "urgent") + "</span>" : "") +
+        "</div>" +
+        d.events.map(function (e) {
+          var t = EV_TAG[e[3]] || ["", "mute"];
+          var isRoutine = e[3] === "routine";
+          return '<div class="ev">' +
+            '<span class="ev-time">' + esc(e[0]) + "</span>" +
+            (isRoutine
+              ? '<span class="av" style="background:var(--raised);color:var(--accent-2)" aria-hidden="true">' +
+                svg(I.repeat) + "</span>"
+              : '<span class="av" style="background:' + hue(e[1]) +
+                '" aria-hidden="true">' + esc(initials(e[1])) + "</span>") +
+            '<span><div class="ev-who">' + esc(e[1]) + "</div>" +
+            '<div class="ev-what">' + esc(e[2]) + "</div></span>" +
+            "<span>" + tag(t[0], t[1]) +
+            (e[4] ? " " + tag(TEAM[e[4]].label, TEAM[e[4]].tag) : "") + "</span>" +
+            "</div>";
+        }).join("");
+    }).join("");
+
+    pane.innerHTML =
+      '<div class="sched-head"><h1>Schedule</h1>' +
+      "<p>Automated routines run in the background. Below them, every upcoming " +
+      "obligation across all clients — follow-up blood work, expiring results, " +
+      "renewals and check-ins — so nothing has to be tracked by hand.</p></div>" +
+      '<div class="sched-body">' + routines +
+      '<div style="margin-top:6px">' + timeline + "</div></div>";
+
+    if (CRON.pathology) {
+      var el = $("cron-path"); if (el) el.textContent = CRON.pathology.schedule;
+      var nx = $("cron-next");
+      if (nx && CRON.pathology.next) nx.textContent = "Next run: " + CRON.pathology.next;
+    }
+  }
 
   /* -------------------------------------------------------- actions */
 
@@ -536,7 +687,21 @@
   function pollBackend() {
     fetch("/api/state", { cache: "no-store" })
       .then(function (r) { return r.json(); })
-      .catch(function () { return null; });
+      .then(function (s) {
+        // Real schedule from the cron service behind the product, so the
+        // times shown are what is actually configured rather than a caption.
+        (s.cron || []).forEach(function (j) {
+          if (/sla|patholog/i.test(j.name || "")) {
+            CRON.pathology = {
+              schedule: /0 9/.test(j.schedule || "") ? "Daily · 09:00"
+                        : (j.schedule || "Daily"),
+              next: j.next || null
+            };
+          }
+        });
+        if (state.queue === "schedule") renderSchedule();
+      })
+      .catch(function () { /* schedule falls back to configured defaults */ });
   }
 
   tickClock();
