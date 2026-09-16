@@ -4,342 +4,59 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>Hermes — Internal AI Operations Assistant · TRT Australia</title>
+<title>Care Operations — TRT Australia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
+
 <div class="app">
 
   <div class="brand">
-    <span class="brand-mark" aria-hidden="true">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 20V10M12 20V4M20 20v-6"/></svg>
-    </span>
+    <span class="brand-mark" aria-hidden="true">TA</span>
     <span>
-      <div class="brand-name">Hermes</div>
-      <div class="brand-sub">Internal AI operations assistant</div>
+      <div class="brand-t">TRT Australia</div>
+      <div class="brand-s">Care operations</div>
     </span>
   </div>
 
   <header class="topbar">
-    <span class="sec" id="view-sec">Section 1</span>
-    <h1 id="view-title">System Architecture</h1>
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search clients, subjects, messages…"
+             aria-label="Search">
+      <span class="kbd">/</span>
+    </label>
     <span class="spacer"></span>
-    <span class="live">
-      <span class="dot" id="live-dot" aria-hidden="true"></span>
-      <span id="live-text">Connecting…</span>
+    <span class="who">
+      <span id="clock">—</span>
+      <span class="av" style="background:#6aa6f7" aria-hidden="true">AK</span>
+      <span>Alex Kaur · Client care</span>
     </span>
   </header>
 
-  <nav class="nav" aria-label="Solution design sections">
-    <div class="nav-label">Solution design</div>
-    <a href="#architecture" data-view="architecture" data-sec="Section 1" data-title="System Architecture" class="active">
-      <span class="sn">1</span> System architecture</a>
-    <a href="#capabilities" data-view="capabilities" data-sec="Section 2" data-title="Technical Justification">
-      <span class="sn">2</span> Platform capabilities</a>
-    <a href="#workflow" data-view="workflow" data-sec="Section 3" data-title="Operational Workflow">
-      <span class="sn">3</span> Operational workflow</a>
-    <a href="#routines" data-view="routines" data-sec="Section 4" data-title="Automated Process Management">
-      <span class="sn">4</span> Automated routines</a>
-    <a href="#roadmap" data-view="roadmap" data-sec="Section 5" data-title="Implementation Roadmap">
-      <span class="sn">5</span> Implementation roadmap</a>
-    <a href="#compliance" data-view="compliance" data-sec="Section 6" data-title="Compliance &amp; Data Privacy">
-      <span class="sn">6</span> Compliance &amp; privacy</a>
+  <nav class="rail" id="rail" aria-label="Queues"></nav>
 
-    <div class="nav-label">Live operations</div>
-    <a href="#inbox" data-view="inbox" data-sec="Live" data-title="Ingestion &amp; Interpretation">
-      <span class="sn">&rsaquo;</span> Triage evidence <span class="count" id="c-inbox">–</span></a>
-    <a href="#board" data-view="board" data-sec="Live" data-title="Ticket Repository">
-      <span class="sn">&rsaquo;</span> Ticket board <span class="count" id="c-tickets">–</span></a>
-    <a href="#sla" data-view="sla" data-sec="Live" data-title="SLA Tracking">
-      <span class="sn">&rsaquo;</span> SLA monitor <span class="count" id="c-sla">–</span></a>
-  </nav>
-
-  <main class="main" id="main">
-
-    <div class="notice" role="note">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-      <span><strong>Demonstration build.</strong> Client names, messages and dates are invented.
-      No real client information is held. Panels marked <em>Live</em> are read from the running
-      Hermes instance; the rest illustrate the design.</span>
+  <section class="list" aria-label="Conversations">
+    <div class="list-head">
+      <h2 id="queue-name">Inbox</h2>
+      <span class="ct" id="queue-count"></span>
+      <span class="spacer"></span>
+      <button class="chip" id="f-unread" aria-pressed="false">Unread</button>
+      <button class="chip" id="f-urgent" aria-pressed="false">Urgent</button>
     </div>
+    <div class="list-body" id="list" role="list"></div>
+  </section>
 
-    <!-- ══════════════════════════════════ §1 SYSTEM ARCHITECTURE -->
-    <section class="view active" id="v-architecture">
-      <p class="lede">
-        Three core operational inputs interface with the assistant, which processes and
-        coordinates actions across systems via a centralised Hermes execution engine. The engine
-        generates and routes ticket instances to designated functional roles, and escalates
-        unfulfilled service level agreements to team leadership.
-        <em>Counts below are live.</em>
-      </p>
+  <main class="pane" id="pane" aria-label="Conversation"></main>
 
-      <div class="card" style="margin-bottom:8px">
-        <svg class="arch" viewBox="0 0 1000 470" role="img"
-             aria-label="Architecture: three inputs feed the Hermes agent engine, which routes to four functional roles">
-
-          <!-- wires: inputs -> engine -->
-          <path class="wire" d="M183 108 V142 H430 V170"/>
-          <path class="wire" d="M500 108 V170"/>
-          <path class="wire" d="M817 108 V142 H570 V170"/>
-
-          <!-- wires: engine -> roles -->
-          <path class="wire" d="M500 272 V300"/>
-          <path class="wire" d="M146 300 H854"/>
-          <path class="wire" d="M146 300 V332"/>
-          <path class="wire" d="M382 300 V332"/>
-          <path class="wire" d="M618 300 V332"/>
-          <path class="wire" d="M854 300 V332"/>
-
-          <!-- arrowheads -->
-          <g fill="var(--line)">
-            <path d="M430 170 l-5 -9 h10 z"/><path d="M500 170 l-5 -9 h10 z"/>
-            <path d="M570 170 l-5 -9 h10 z"/>
-            <path d="M146 332 l-5 -9 h10 z"/><path d="M382 332 l-5 -9 h10 z"/>
-            <path d="M618 332 l-5 -9 h10 z"/><path d="M854 332 l-5 -9 h10 z"/>
-          </g>
-
-          <!-- inputs -->
-          <g id="n-chat">
-            <rect x="40" y="22" width="286" height="86" rx="10"
-                  fill="var(--input-bg)" stroke="var(--input)" stroke-width="1.5"/>
-            <text class="t-title" x="60" y="52">Internal Communication</text>
-            <text class="t-sub"   x="60" y="72">Inbound message stream</text>
-            <text class="t-count" x="60" y="94" fill="var(--input)" id="a-chat">not connected</text>
-          </g>
-          <g id="n-tickets">
-            <rect x="357" y="22" width="286" height="86" rx="10"
-                  fill="var(--input-bg)" stroke="var(--input)" stroke-width="1.5"/>
-            <text class="t-title" x="377" y="52">Ticketing System</text>
-            <text class="t-sub"   x="377" y="72">Central task repository</text>
-            <text class="t-count" x="377" y="94" fill="var(--input)" id="a-tickets">–</text>
-          </g>
-          <g id="n-email">
-            <rect x="674" y="22" width="286" height="86" rx="10"
-                  fill="var(--input-bg)" stroke="var(--input)" stroke-width="1.5"/>
-            <text class="t-title" x="694" y="52">Client Email Gateway</text>
-            <text class="t-sub"   x="694" y="72">Inbound &amp; outbound pipeline</text>
-            <text class="t-count" x="694" y="94" fill="var(--input)" id="a-email">–</text>
-          </g>
-
-          <!-- engine -->
-          <rect x="250" y="170" width="500" height="102" rx="12"
-                fill="var(--engine-bg)" stroke="var(--engine)" stroke-width="2"/>
-          <circle cx="292" cy="221" r="6" fill="var(--engine)" class="spark"/>
-          <text class="t-eng"    x="500" y="214" text-anchor="middle">HERMES AGENT ENGINE</text>
-          <text class="t-engsub" x="500" y="240" text-anchor="middle">Ingestion · Interpretation · Routing · Scheduling · Escalation</text>
-          <text class="t-count"  x="500" y="261" text-anchor="middle" fill="var(--engine)" id="a-engine">–</text>
-
-          <!-- roles -->
-          <g>
-            <rect x="40" y="332" width="212" height="102" rx="10"
-                  fill="var(--role-bg)" stroke="var(--role)" stroke-width="1.5"/>
-            <text class="t-title" x="146" y="366" text-anchor="middle">Physician</text>
-            <text class="t-sub"   x="146" y="387" text-anchor="middle">Clinical evaluations</text>
-            <text class="t-count" x="146" y="414" text-anchor="middle" fill="var(--role)" id="a-physician">–</text>
-          </g>
-          <g>
-            <rect x="276" y="332" width="212" height="102" rx="10"
-                  fill="var(--role-bg)" stroke="var(--role)" stroke-width="1.5"/>
-            <text class="t-title" x="382" y="366" text-anchor="middle">Nursing Staff</text>
-            <text class="t-sub"   x="382" y="387" text-anchor="middle">Client consultations</text>
-            <text class="t-count" x="382" y="414" text-anchor="middle" fill="var(--role)" id="a-nursing">–</text>
-          </g>
-          <g>
-            <rect x="512" y="332" width="212" height="102" rx="10"
-                  fill="var(--role-bg)" stroke="var(--role)" stroke-width="1.5"/>
-            <text class="t-title" x="618" y="366" text-anchor="middle">Customer Support</text>
-            <text class="t-sub"   x="618" y="387" text-anchor="middle">Administrative support</text>
-            <text class="t-count" x="618" y="414" text-anchor="middle" fill="var(--role)" id="a-support">–</text>
-          </g>
-          <g>
-            <rect x="748" y="332" width="212" height="102" rx="10"
-                  fill="var(--lead-bg)" stroke="var(--lead)" stroke-width="1.5"/>
-            <text class="t-title" x="854" y="366" text-anchor="middle">Team Leadership</text>
-            <text class="t-sub"   x="854" y="387" text-anchor="middle">SLA escalations</text>
-            <text class="t-count" x="854" y="414" text-anchor="middle" fill="var(--lead)" id="a-leadership">–</text>
-          </g>
-
-          <text x="500" y="459" text-anchor="middle" font-size="11.5" fill="var(--dimmer)">
-            A unified Hermes instance manages all process flows
-          </text>
-        </svg>
-      </div>
-
-      <div class="grid cols-12">
-        <div class="card kpi span-3"><div class="n" id="k-open">–</div>
-          <div class="l">Ticket instances</div><div class="sub" id="k-open-sub">&nbsp;</div></div>
-        <div class="card kpi span-3"><div class="n" id="k-human">–</div>
-          <div class="l">Routed to a person</div><div class="sub">Clinical or uncertain</div></div>
-        <div class="card kpi span-3"><div class="n" id="k-sla">–</div>
-          <div class="l">SLAs tracked</div><div class="sub">Against target completion</div></div>
-        <div class="card kpi span-3"><div class="n" id="k-esc">–</div>
-          <div class="l">Escalations</div><div class="sub" id="k-esc-sub">&nbsp;</div></div>
-      </div>
-    </section>
-
-    <!-- ══════════════════════════════════ §2 CAPABILITIES -->
-    <section class="view" id="v-capabilities">
-      <p class="lede">
-        Hermes is an open-source, self-hostable agent framework (Nous Research, MIT licence). It
-        provides the foundational architecture natively, allowing effort to focus on custom
-        integrations and business logic rather than platform engineering. Each capability below is
-        marked according to what has been <em>demonstrated on this deployment</em>.
-      </p>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th style="width:190px">Native platform feature</th>
-            <th>Operational application</th><th style="width:150px">Status</th></tr></thead>
-          <tbody id="t-caps"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- ══════════════════════════════════ §3 WORKFLOW -->
-    <section class="view" id="v-workflow">
-      <p class="lede">
-        The core lifecycle for processing communications into resolved operational tasks. Each
-        stage below shows what the running system actually did with a real message.
-      </p>
-      <div class="stages" id="stages"></div>
-    </section>
-
-    <!-- ══════════════════════════════════ §4 ROUTINES -->
-    <section class="view" id="v-routines">
-      <p class="lede">
-        In addition to real-time event monitoring, two automated background routines operate via
-        scheduled cron services within the Hermes framework.
-      </p>
-      <div class="grid cols-12">
-        <div class="routine span-12" style="margin-bottom:0">
-          <div class="card-head"><h2>Client check-in routine</h2><span class="spacer"></span>
-            <span id="r1-status"></span></div>
-          <div class="chain">
-            <div class="link off"><div class="lt">Scheduled trigger</div><div class="ld">Monthly interval</div></div>
-            <div class="link off"><div class="lt">Template email dispatch</div><div class="ld">Status inquiry to the client</div></div>
-            <div class="link off"><div class="lt">Inbound response parsing</div><div class="ld">Reply read and understood</div></div>
-            <div class="link off"><div class="lt">Ticket generation</div><div class="ld">Physician or nursing assignment</div></div>
-          </div>
-          <p class="src" style="margin-top:10px">
-            Inbound communications are evaluated, classified and converted into appropriate ticket
-            types — clinical inquiries to attending physicians, general requests to nursing staff.
-            Requires the client mailbox and approved template copy before it can be enabled.
-          </p>
-        </div>
-
-        <div class="routine span-12">
-          <div class="card-head"><h2>Pathology monitoring routine</h2><span class="spacer"></span>
-            <span id="r2-status"></span></div>
-          <div class="chain">
-            <div class="link on"><div class="lt">Scheduled trigger</div><div class="ld" id="r2-sched">Daily interval</div></div>
-            <div class="link on"><div class="lt">Audit compliance requirements</div><div class="ld">Pathology and follow-up schedule</div></div>
-            <div class="link on"><div class="lt">Issue operational alert</div><div class="ld">Pre-expiration notification</div></div>
-          </div>
-          <p class="src" style="margin-top:10px">
-            Replaces manual review with automated proactive alerting, mitigating the risk of
-            overdue compliance items.
-          </p>
-          <div class="table-wrap" style="margin-top:11px"><table>
-            <thead><tr><th>Last sweep</th><th>Obligations audited</th><th>Approaching</th><th>Overdue</th></tr></thead>
-            <tbody id="t-sweep"></tbody>
-          </table></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ══════════════════════════════════ §5 ROADMAP -->
-    <section class="view" id="v-roadmap">
-      <p class="lede">
-        Structured in phased milestones to ensure immediate operational utility from initial
-        deployment. Each phase undergoes formal validation prior to the next.
-        <em>Progress reflects what is demonstrable on this build.</em>
-      </p>
-      <div id="phases"></div>
-    </section>
-
-    <!-- ══════════════════════════════════ §6 COMPLIANCE -->
-    <section class="view" id="v-compliance">
-      <p class="lede">
-        Because this solution processes sensitive client health information, the architecture
-        adheres to the Australian Privacy Principles from inception.
-      </p>
-      <div class="grid cols-12">
-        <div class="card span-7"><div class="card-head"><h2>Commitments</h2></div>
-          <div id="t-compliance"></div></div>
-        <div class="card span-5">
-          <div class="card-head"><h2>Enforced controls</h2><span class="spacer"></span>
-            <span class="card-note">Live</span></div>
-          <div id="t-safety"></div>
-          <p class="src" style="margin-top:11px">
-            Verified automatically on every build. If a control is switched off, the build fails.
-          </p>
-          <div class="card-head" style="margin-top:16px"><h2>Decision authority</h2></div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Permitted</th><th>Prohibited</th></tr></thead>
-            <tbody>
-              <tr><td>Identify a request as clinical and route it</td><td>Assess whether treatment is appropriate</td></tr>
-              <tr><td>List which markers a panel is missing</td><td>Interpret what a result means</td></tr>
-              <tr><td>Report a follow-up as overdue</td><td>Advise on stopping or changing treatment</td></tr>
-              <tr><td>Escalate an unattended ticket</td><td>Reply to a client on the clinic's behalf</td></tr>
-            </tbody>
-          </table></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ══════════════════════════════════ LIVE: INBOX -->
-    <section class="view" id="v-inbox">
-      <p class="lede">
-        Stage 1 and 2 of the operational workflow. Every inbound communication is read,
-        interpreted and converted into a structured record. The reasoning is retained on the
-        ticket so a reviewer can see why it was routed as it was — part of the audit trail.
-      </p>
-      <div id="inbox-list"></div>
-    </section>
-
-    <!-- ══════════════════════════════════ LIVE: BOARD -->
-    <section class="view" id="v-board">
-      <p class="lede">
-        Stage 3 — taxonomic routing. Ticket instances held in the central task repository,
-        by designated functional role. <em>Live.</em>
-      </p>
-      <div class="board" id="board"></div>
-    </section>
-
-    <!-- ══════════════════════════════════ LIVE: SLA -->
-    <section class="view" id="v-sla">
-      <p class="lede">
-        Stages 4 and 5 — an automated routine audits open tickets against operational deadlines
-        and dispatches alerts to team leadership before a target completion date is missed.
-        <em>Live.</em>
-      </p>
-      <div class="grid cols-12" style="margin-bottom:8px">
-        <div class="card kpi span-4"><div class="n" id="s-tracked">–</div>
-          <div class="l">Obligations tracked</div></div>
-        <div class="card kpi span-4"><div class="n" id="s-soon">–</div>
-          <div class="l">Approaching target</div><div class="sub">Inside the warning window</div></div>
-        <div class="card kpi span-4"><div class="n" id="s-over">–</div>
-          <div class="l">Past target</div><div class="sub">Escalated to leadership</div></div>
-      </div>
-      <div class="card">
-        <div class="card-head"><h2>Tracked obligations</h2><span class="spacer"></span>
-          <span class="card-note" id="sla-note">Audited daily</span></div>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Ticket</th><th>Obligation</th><th>Client</th><th>Target</th>
-            <th>Remaining</th><th>State</th></tr></thead>
-          <tbody id="t-sla"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-  </main>
 </div>
+
+<div class="toast-wrap" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
 <script src="app.js"></script>
 </body>
 </html>
