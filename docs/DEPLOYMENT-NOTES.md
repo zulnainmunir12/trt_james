@@ -149,3 +149,29 @@ monthly check-in and daily pathology monitor silently stop running.
 
 Related: cron scripts must live in `~/.hermes/scripts/` and be referenced by
 **filename only**. Absolute paths are rejected.
+
+## 8. Gemini free-tier quota is PER MODEL
+
+Verified 16 September 2026, with `gemini-3.6-flash` fully rate limited:
+
+| Model | Result |
+|---|---|
+| `gemini-3.6-flash` | HTTP 429 — limit: 20, retry in 45s |
+| `gemini-3.5-flash` | ✅ OK |
+| `gemini-3-flash-preview` | ✅ OK |
+| `gemini-3.1-flash-lite` | ✅ OK |
+
+So exhausting one model does not exhaust the project. During development,
+switching model is a faster unblock than waiting out a window.
+
+Two practical notes:
+
+- The 429 body names its own cooldown (`Please retry in 45.1s`). Honour it
+  rather than guessing with exponential backoff — retries consume quota, so
+  blind retrying turns a small overrun into a cascade that never drains.
+- **Do not run two eval jobs concurrently.** Doing so doubles the request
+  rate and saturates the window; every message then comes back 429 and the
+  run scores nothing.
+
+None of this applies on a paid tier, which is what production will use.
+Reproduce the check with `setup/probe-model-quota.sh`.
