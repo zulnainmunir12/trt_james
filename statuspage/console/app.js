@@ -35,7 +35,11 @@
     circle: '<circle cx="12" cy="12" r="9"/>',
     half: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>',
     pause: '<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>',
-    flag: '<path d="M4 22V4M4 4h13l-2 4 2 4H4"/>'
+    flag: '<path d="M4 22V4M4 4h13l-2 4 2 4H4"/>',
+    home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'
   };
   function svg(d, cls) {
     return '<svg class="' + (cls || "") + '" viewBox="0 0 24 24" fill="none" ' +
@@ -175,6 +179,8 @@
   /* ----------------------------------------------------------- queues */
 
   var QUEUES = [
+    { id: "overview",  name: "Overview",      icon: I.home, wide: true,
+      test: function () { return true; } },
     { id: "inbox",     name: "All open",      icon: I.inbox, test: function (m) { return true; } },
     { id: "held",      name: "Needs a person", icon: I.alert, alert: true,
       test: function (m) { return m.route === "held"; } },
@@ -191,6 +197,9 @@
       test: function (m) { return m.channel === "email"; } },
     { id: "slack",     name: "Internal chat", icon: I.hash,
       test: function (m) { return m.channel === "slack"; } },
+    { sep: "Clients" },
+    { id: "clients",   name: "All clients",   icon: I.users, wide: true,
+      test: function () { return true; } },
     { sep: "Scheduled" },
     { id: "schedule",  name: "Schedule",      icon: I.calendar, wide: true,
       test: function () { return true; } },
@@ -201,8 +210,9 @@
       test: function () { return true; } }
   ];
 
-  var state = { queue: "inbox", selected: null, unreadOnly: false,
-                urgentOnly: false, stage: null, q: "" };
+  var state = { queue: "overview", selected: null, unreadOnly: false,
+                urgentOnly: false, stage: null, q: "",
+                client: null, clientQ: "", clientFocus: false };
 
   function source(qid) {
     var q = QUEUES.filter(function (x) { return x.id === qid; })[0];
@@ -405,12 +415,331 @@
 
   function render() {
     renderRail();
+    if (state.queue === "overview") { renderOverview(); return; }
+    if (state.queue === "clients") {
+      if (state.client) renderClientDetail(); else renderClients();
+      return;
+    }
     if (state.queue === "schedule") { renderSchedule(); return; }
     document.querySelector(".app").classList.remove("wide");
     renderList();
     renderPane();
   }
 
+
+
+  /* ==================================================== client records */
+
+  var CLIENTS = [
+    { name: "Michael Reed", email: "m.reed@example.com", plan: "Yearly",
+      fee: "$860", since: "1 Jul 2026", started: "1 Jul 2026",
+      next: "Follow-up bloods", due: 13, state: "active" },
+    { name: "Priya Sharma", email: "p.sharma@example.com", plan: "Six months",
+      fee: "$480", since: "3 Mar 2026", started: "9 Mar 2026",
+      next: "Follow-up bloods", due: -2, state: "active" },
+    { name: "Daniel Whitcombe", email: "d.whitcombe@example.com", plan: "Quarterly",
+      fee: "$240", since: "14 Jan 2026", started: "20 Jan 2026",
+      next: "Membership renewal", due: 28, state: "active" },
+    { name: "Tom Nguyen", email: "t.nguyen@example.com", plan: "Yearly",
+      fee: "$860", since: "2 Feb 2026", started: "8 Feb 2026",
+      next: "Results expire", due: 21, state: "active" },
+    { name: "Rachel Santos", email: "r.santos@example.com", plan: "Quarterly",
+      fee: "$240", since: "8 Aug 2026", started: "12 Aug 2026",
+      next: "Follow-up bloods", due: 41, state: "active" },
+    { name: "Amara Brennan", email: "a.brennan@example.com", plan: "—",
+      fee: "—", since: "—", started: "—",
+      next: "Eligibility review", due: 3, state: "enquiry" },
+    { name: "Jordan Bailey", email: "j.bailey@example.com", plan: "Yearly",
+      fee: "$860", since: "19 Apr 2026", started: "26 Apr 2026",
+      next: "Prescription renewal", due: 6, state: "active" },
+    { name: "Hannah Poulos", email: "h.poulos@example.com", plan: "Six months",
+      fee: "$480", since: "11 Nov 2025", started: "18 Nov 2025",
+      next: "Loyalty rate applies", due: 56, state: "active" },
+    { name: "Owen Marsh", email: "o.marsh@example.com", plan: "Quarterly",
+      fee: "$240", since: "5 Jun 2026", started: "12 Jun 2026",
+      next: "Follow-up bloods", due: 0, state: "active" },
+    { name: "Nadia Cheng", email: "n.cheng@example.com", plan: "—",
+      fee: "—", since: "—", started: "—",
+      next: "Awaiting blood work", due: 9, state: "enquiry" }
+  ];
+
+  function dueTag(d) {
+    if (d < 0) return tag(Math.abs(d) + (Math.abs(d) === 1 ? " day late" : " days late"), "urgent");
+    if (d === 0) return tag("Due today", "warn");
+    if (d <= 14) return tag("In " + d + " days", "warn");
+    return tag("In " + d + " days", "mute");
+  }
+
+  function renderClients() {
+    var pane = $("pane");
+    document.querySelector(".app").classList.add("wide");
+    pane.classList.add("open");
+
+    var q = (state.clientQ || "").toLowerCase();
+    var rows = CLIENTS.filter(function (c) {
+      return !q || (c.name + " " + c.email + " " + c.next).toLowerCase().indexOf(q) > -1;
+    }).sort(function (a, b) { return a.due - b.due; });
+
+    pane.innerHTML =
+      '<div class="cl-head"><h1>Clients</h1>' +
+      '<span class="ct" style="font-size:12.5px;color:var(--dim)">' +
+        rows.length + " of " + CLIENTS.length + "</span>" +
+      '<span class="spacer"></span>' +
+      '<label class="cl-search">' + svg(I.search || I.inbox) +
+        '<input id="cl-q" type="search" placeholder="Search clients…" value="' +
+        esc(state.clientQ || "") + '" aria-label="Search clients"></label></div>' +
+      '<div class="cl-body"><div class="panel"><table class="cl-table">' +
+      "<thead><tr><th>Client</th><th>Membership</th><th>Treatment from</th>" +
+      "<th>Next obligation</th><th>When</th></tr></thead><tbody>" +
+      (rows.length ? rows.map(function (c) {
+        return '<tr data-client="' + esc(c.name) + '">' +
+          '<td><span class="cl-name"><span class="av" style="background:' + hue(c.name) +
+            '" aria-hidden="true">' + esc(initials(c.name)) + "</span>" +
+            '<span><span class="n">' + esc(c.name) + "</span><br>" +
+            '<span class="e">' + esc(c.email) + "</span></span></span></td>" +
+          "<td>" + (c.state === "enquiry" ? tag("Enquiry", "mute")
+                    : esc(c.plan) + " · " + esc(c.fee)) + "</td>" +
+          "<td>" + esc(c.started) + "</td>" +
+          "<td>" + esc(c.next) + "</td>" +
+          "<td>" + dueTag(c.due) + "</td></tr>";
+      }).join("")
+       : '<tr><td colspan="5" class="empty">No clients match that search.</td></tr>') +
+      "</tbody></table></div></div>";
+
+    var box = $("cl-q");
+    if (box) {
+      box.oninput = function () { state.clientQ = this.value; renderClients(); };
+      if (state.clientFocus) { box.focus(); box.selectionStart = box.value.length; }
+    }
+    state.clientFocus = false;
+
+    pane.querySelectorAll("tr[data-client]").forEach(function (tr) {
+      tr.onclick = function () {
+        state.client = tr.getAttribute("data-client");
+        renderClientDetail();
+      };
+    });
+  }
+
+  function renderClientDetail() {
+    var c = CLIENTS.filter(function (x) { return x.name === state.client; })[0];
+    if (!c) { renderClients(); return; }
+    var pane = $("pane");
+
+    // Their open conversations, pulled from the live inbox rather than a
+    // second copy of the same data.
+    var theirs = DATA.concat(DONE).filter(function (m) {
+      return m.from === c.name || (m.client && m.client.name === c.name);
+    });
+
+    var stages = [
+      ["Blood work collected", c.started !== "—" ? "Before " + c.started : "Not yet", "done"],
+      ["Practitioner review", c.state === "enquiry" ? "Awaiting" : "Completed",
+       c.state === "enquiry" ? "due" : "done"],
+      ["Treatment commenced", c.started, c.state === "enquiry" ? "" : "now"],
+      [c.next, c.due < 0 ? Math.abs(c.due) + " days overdue" : "in " + c.due + " days",
+       c.due < 0 ? "late" : "due"]
+    ];
+
+    pane.innerHTML =
+      '<div class="cl-head">' +
+        '<button class="btn ghost" id="cl-back">' + svg(I.back) + "All clients</button>" +
+      "</div>" +
+      '<div class="cl-body"><div class="prof-hero">' +
+        '<span class="av" style="background:' + hue(c.name) + '" aria-hidden="true">' +
+          esc(initials(c.name)) + "</span><div>" +
+        "<h1>" + esc(c.name) + "</h1>" +
+        '<div class="sub">' + esc(c.email) + "</div></div>" +
+        '<span style="margin-left:auto">' + dueTag(c.due) + "</span></div>" +
+
+      '<div class="profile"><div>' +
+        '<div class="panel"><div class="panel-head"><h2>Care timeline</h2></div>' +
+        '<div class="panel-body"><div class="tl">' +
+        stages.map(function (s) {
+          return '<div class="tl-item ' + s[2] + '">' +
+            '<div class="tl-d">' + esc(s[1]) + "</div>" +
+            '<div class="tl-t">' + esc(s[0]) + "</div></div>";
+        }).join("") + "</div></div></div>" +
+
+        '<div class="panel"><div class="panel-head"><h2>Conversations</h2>' +
+        '<span class="pn">' + theirs.length + "</span></div>" +
+        '<div class="panel-body flush">' +
+        (theirs.length ? theirs.map(function (m) {
+          return '<button class="row" data-open="' + m.id + '">' +
+            '<span class="av" style="background:' + hue(m.from) + '" aria-hidden="true">' +
+              esc(initials(m.from)) + "</span>" +
+            '<span><div class="rt">' + esc(m.subject) + "</div>" +
+            '<div class="rd">' + esc(m.time) + "</div></span>" +
+            "<span>" + (m.filtered ? "" : stageTag(m)) + "</span></button>";
+        }).join("")
+         : '<div class="empty" style="padding:26px">No conversations yet.</div>') +
+        "</div></div>" +
+      "</div><aside>" +
+        '<div class="panel"><div class="panel-head"><h2>Membership</h2></div>' +
+        '<div class="panel-body">' +
+        '<div class="kv"><span class="k">Plan</span><span class="v">' +
+          (c.state === "enquiry" ? "Enquiry" : esc(c.plan)) + "</span></div>" +
+        '<div class="kv"><span class="k">Fee</span><span class="v">' + esc(c.fee) + "</span></div>" +
+        '<div class="kv"><span class="k">Member since</span><span class="v">' + esc(c.since) + "</span></div>" +
+        '<div class="kv"><span class="k">Treatment from</span><span class="v">' + esc(c.started) + "</span></div>" +
+        "</div></div>" +
+        '<div class="panel"><div class="panel-head"><h2>Next obligation</h2></div>' +
+        '<div class="panel-body"><div style="font-weight:700;margin-bottom:6px">' +
+          esc(c.next) + "</div>" + dueTag(c.due) +
+        '<div style="font-size:11.5px;color:var(--dimmer);margin-top:10px;line-height:1.45">' +
+        "Generated from the clinic's published care standards. Tracked automatically." +
+        "</div></div></div>" +
+      "</aside></div></div>";
+
+    $("cl-back").onclick = function () { state.client = null; renderClients(); };
+    pane.querySelectorAll("[data-open]").forEach(function (b) {
+      b.onclick = function () {
+        state.queue = "inbox"; state.client = null;
+        state.selected = b.getAttribute("data-open");
+        render();
+      };
+    });
+  }
+
+  /* ======================================================== overview */
+
+  function renderOverview() {
+    var pane = $("pane");
+    document.querySelector(".app").classList.add("wide");
+    pane.classList.add("open");
+
+    var open = DATA.length;
+    var held = DATA.filter(function (m) { return m.route === "held"; }).length;
+    var urgent = DATA.filter(function (m) { return m.urgent; });
+    var late = CLIENTS.filter(function (c) { return c.due < 0; });
+    var week = CLIENTS.filter(function (c) { return c.due >= 0 && c.due <= 7; });
+    var routed = DATA.filter(function (m) { return m.route && m.route !== "held"; }).length;
+
+    function loadOf(k) {
+      return DATA.filter(function (m) { return m.route === k; }).length;
+    }
+    var maxLoad = Math.max(1, loadOf("physician"), loadOf("nursing"), loadOf("support"));
+
+    var attention = urgent.map(function (m) {
+      return '<button class="row" data-open="' + m.id + '">' +
+        '<span class="av" style="background:' + hue(m.from) + '" aria-hidden="true">' +
+          esc(initials(m.from)) + "</span>" +
+        '<span><div class="rt">' + esc(m.subject) + "</div>" +
+        '<div class="rd">' + esc(m.from) + " · " + esc(m.due || "") + "</div></span>" +
+        "<span>" + (m.route === "held" ? tag("Needs a person", "urgent")
+                                       : tag("Urgent", "urgent")) + "</span></button>";
+    }).concat(late.map(function (c) {
+      return '<button class="row" data-client="' + esc(c.name) + '">' +
+        '<span class="av" style="background:' + hue(c.name) + '" aria-hidden="true">' +
+          esc(initials(c.name)) + "</span>" +
+        '<span><div class="rt">' + esc(c.next) + " — " + esc(c.name) + "</div>" +
+        '<div class="rd">Past the target date</div></span>' +
+        "<span>" + dueTag(c.due) + "</span></button>";
+    })).join("");
+
+    pane.innerHTML =
+      '<div class="ov-head"><h1>Good evening, Alex</h1>' +
+      "<p>Here is where things stand across the clinic right now.</p></div>" +
+      '<div class="ov-body">' +
+
+      '<div class="stats">' +
+        '<div class="stat info"><div class="sn">' + open + "</div>" +
+          '<div class="sl">Open items</div><div class="ss">' + routed +
+          " routed automatically</div></div>" +
+        '<div class="stat ' + (held ? "bad" : "good") + '"><div class="sn">' + held + "</div>" +
+          '<div class="sl">Needs a person</div><div class="ss">Clinical or uncertain</div></div>' +
+        '<div class="stat ' + (week.length ? "warn" : "good") + '"><div class="sn">' +
+          week.length + "</div>" +
+          '<div class="sl">Due this week</div><div class="ss">Across all clients</div></div>' +
+        '<div class="stat ' + (late.length ? "bad" : "good") + '"><div class="sn">' +
+          late.length + "</div>" +
+          '<div class="sl">Past due</div><div class="ss">' +
+          (late.length ? "Escalated to leadership" : "Nothing overdue") + "</div></div>" +
+      "</div>" +
+
+      '<div class="ov-grid"><div>' +
+        '<div class="panel"><div class="panel-head"><h2>Needs attention now</h2>' +
+          '<span class="pn">' + (urgent.length + late.length) + "</span></div>" +
+          '<div class="panel-body flush">' +
+          (attention || '<div class="empty" style="padding:28px">Nothing urgent. ' +
+           "Everything is inside its target date.</div>") + "</div></div>" +
+
+        '<div class="panel"><div class="panel-head"><h2>Latest through the door</h2>' +
+          '<span class="spacer"></span><span class="link">All open</span></div>' +
+          '<div class="panel-body flush">' +
+          DATA.slice(0, 5).map(function (m) {
+            var t = m.route ? TEAM[m.route] : null;
+            return '<button class="row" data-open="' + m.id + '">' +
+              '<span class="av' + (m.channel === "slack" ? " slack" : "") +
+                '" style="background:' + hue(m.from) + '" aria-hidden="true">' +
+                esc(initials(m.from)) + "</span>" +
+              '<span><div class="rt">' + esc(m.subject) + "</div>" +
+              '<div class="rd">' + esc(m.from) + " · " + esc(m.time) + "</div></span>" +
+              "<span>" + (t ? tag(t.label, t.tag) : "") + "</span></button>";
+          }).join("") + "</div></div>" +
+      "</div><div>" +
+
+        '<div class="panel"><div class="panel-head"><h2>Workload</h2></div>' +
+          '<div class="panel-body">' +
+          ["physician", "nursing", "support"].map(function (k) {
+            var n = loadOf(k);
+            return '<div class="load"><span class="ln">' + TEAM[k].label + "</span>" +
+              '<span class="lb"><i style="width:' + Math.round(n / maxLoad * 100) +
+              "%;background:" + TEAM[k].colour + '"></i></span>' +
+              '<span class="lc">' + n + "</span></div>";
+          }).join("") +
+          '<div style="font-size:11.5px;color:var(--dimmer);margin-top:8px;line-height:1.45">' +
+          "Open items by queue. Reassign from any conversation." +
+          "</div></div></div>" +
+
+        '<div class="panel"><div class="panel-head"><h2>Coming up</h2>' +
+          '<span class="spacer"></span><span class="link">Schedule</span></div>' +
+          '<div class="panel-body flush">' +
+          CLIENTS.slice().sort(function (a, b) { return a.due - b.due; })
+            .filter(function (c) { return c.due >= 0; }).slice(0, 5)
+            .map(function (c) {
+              return '<button class="row" data-client="' + esc(c.name) + '">' +
+                '<span class="av" style="background:' + hue(c.name) + '" aria-hidden="true">' +
+                  esc(initials(c.name)) + "</span>" +
+                '<span><div class="rt">' + esc(c.name) + "</div>" +
+                '<div class="rd">' + esc(c.next) + "</div></span>" +
+                "<span>" + dueTag(c.due) + "</span></button>";
+            }).join("") + "</div></div>" +
+
+        '<div class="panel"><div class="panel-head"><h2>Channels today</h2></div>' +
+          '<div class="panel-body">' +
+          '<div class="kv"><span class="k">Client email</span><span class="v">' +
+            DATA.filter(function (m) { return m.channel === "email"; }).length + "</span></div>" +
+          '<div class="kv"><span class="k">Internal chat</span><span class="v">' +
+            DATA.filter(function (m) { return m.channel === "slack"; }).length + "</span></div>" +
+          '<div class="kv"><span class="k">Filtered out</span><span class="v">' +
+            FILTERED.length + "</span></div>" +
+          '<div class="kv"><span class="k">Closed</span><span class="v">' +
+            DONE.length + "</span></div>" +
+          "</div></div>" +
+      "</div></div></div>";
+
+    pane.querySelectorAll("[data-open]").forEach(function (b) {
+      b.onclick = function () {
+        state.queue = "inbox"; state.selected = b.getAttribute("data-open");
+        render();
+      };
+    });
+    pane.querySelectorAll("[data-client]").forEach(function (b) {
+      b.onclick = function () {
+        state.queue = "clients"; state.client = b.getAttribute("data-client");
+        renderRail(); renderClientDetail();
+      };
+    });
+    pane.querySelectorAll(".link").forEach(function (b) {
+      b.style.cursor = "pointer";
+      b.onclick = function () {
+        state.queue = this.textContent === "Schedule" ? "schedule" : "inbox";
+        state.selected = null;
+        render();
+      };
+    });
+  }
 
   /* -------------------------------------------------------- schedule */
 
@@ -680,6 +1009,7 @@
     if (!b) return;
     state.queue = b.getAttribute("data-q");
     state.selected = null;
+    state.client = null;
     render();
   });
 
