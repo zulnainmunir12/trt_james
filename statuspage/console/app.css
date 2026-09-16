@@ -315,3 +315,11 @@ button { cursor: pointer; background: none; border: 0; }
   .back-btn { display: inline-flex !important; }
 }
 .back-btn { display: none; }
+
+/* assign menu — show which queue the item is already in */
+.menu-cap { font-size: 10px; text-transform: uppercase; letter-spacing: .09em;
+            color: var(--dimmer); font-weight: 700; padding: 6px 10px 4px; }
+.menu-pop button[aria-current="true"] { background: var(--accent-bg); color: var(--ink); }
+.swatch { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.tick { margin-left: auto; display: inline-flex; color: var(--accent-2); }
+.tick svg { width: 14px; height: 14px; }

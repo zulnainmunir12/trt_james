@@ -154,7 +154,7 @@
   /* ----------------------------------------------------------- queues */
 
   var QUEUES = [
-    { id: "inbox",     name: "Inbox",         icon: I.inbox, test: function (m) { return true; } },
+    { id: "inbox",     name: "All open",      icon: I.inbox, test: function (m) { return true; } },
     { id: "held",      name: "Needs a person", icon: I.alert, alert: true,
       test: function (m) { return m.route === "held"; } },
     { id: "physician", name: "Physician",     icon: I.stethoscope,
@@ -209,13 +209,15 @@
   function renderRail() {
     $("rail").innerHTML = QUEUES.map(function (q) {
       if (q.sep) return '<div class="rail-label">' + esc(q.sep) + "</div>";
+      // Badge is always the number of open items in that queue - the same
+      // number the list header shows. Unread is indicated by the dot on the
+      // row, not by a second conflicting count.
       var rows = inQueue(q.id);
-      var unread = rows.filter(function (m) { return m.unread; }).length;
-      var n = q.id === "done" || q.id === "filtered" ? rows.length : (unread || rows.length);
+      var n = rows.length;
       return '<button class="q" data-q="' + q.id + '" role="link" aria-current="' +
         (state.queue === q.id) + '">' + svg(q.icon, "qi") +
         "<span>" + esc(q.name) + "</span>" +
-        (n ? '<span class="qn' + (q.alert && rows.length ? " alert" : "") + '">' + n + "</span>" : "") +
+        (n ? '<span class="qn' + (q.alert ? " alert" : "") + '">' + n + "</span>" : "") +
         "</button>";
     }).join("");
   }
@@ -224,7 +226,12 @@
     var rows = visible();
     var qname = (QUEUES.filter(function (x) { return x.id === state.queue; })[0] || {}).name;
     $("queue-name").textContent = qname || "Inbox";
-    $("queue-count").textContent = rows.length + (rows.length === 1 ? " item" : " items");
+
+    // One consistent count. Showing "10 items" beside a badge reading "2"
+    // made the same queue look like two different sizes.
+    var unread = rows.filter(function (m) { return m.unread; }).length;
+    $("queue-count").textContent =
+      rows.length + " open" + (unread ? " · " + unread + " unread" : "");
 
     if (!rows.length) {
       $("list").innerHTML = '<div class="empty">' + svg(I.check) +
@@ -392,20 +399,27 @@
     var host = $("a-assign").parentNode;
     if (host.querySelector(".menu-pop")) { closeMenus(); return; }
     closeMenus();
+    var now = current();
     var pop = document.createElement("div");
     pop.className = "menu-pop";
-    pop.innerHTML = Object.keys(TEAM).map(function (k) {
-      return '<button data-to="' + k + '">' +
-        '<span class="tag t-' + TEAM[k].tag + ' bare" style="width:8px;height:8px;' +
-        "padding:0;border-radius:50%;background:" + TEAM[k].colour + '"></span>' +
-        esc(TEAM[k].label) + "</button>";
-    }).join("") + '<div class="sep"></div><button data-to="">Unassign</button>';
+    pop.innerHTML =
+      '<div class="menu-cap">Move to</div>' +
+      Object.keys(TEAM).map(function (k) {
+        var isCurrent = now && now.route === k;
+        return '<button data-to="' + k + '"' + (isCurrent ? ' aria-current="true"' : "") + ">" +
+          '<span class="swatch" style="background:' + TEAM[k].colour + '"></span>' +
+          esc(TEAM[k].label) +
+          (isCurrent ? '<span class="tick">' + svg(I.check) + "</span>" : "") +
+          "</button>";
+      }).join("") +
+      '<div class="sep"></div><button data-to="">Unassign</button>';
     host.appendChild(pop);
     pop.addEventListener("click", function (e) {
       var b = e.target.closest("button[data-to]");
       if (!b) return;
       var to = b.getAttribute("data-to");
       var m = current();
+      if (m.route === to) { closeMenus(); return; }   // already there
       m.route = to || null;
       m.why = to
         ? "Reassigned to " + TEAM[to].label + " by Alex Kaur."
