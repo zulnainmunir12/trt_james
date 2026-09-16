@@ -609,3 +609,83 @@ body {
   .ov-hero h1 { font-size: 28px; }
   .stats { margin-top: -34px; }
 }
+
+/* ============================================ TRT design-language pass
+ *
+ * Three signatures taken from their site source that the first pass missed:
+ *
+ *   .eyebrow  mono, 11px, .24em tracking, uppercase, accent blue — their
+ *             micro-label. Monospace at that tracking is an unusual,
+ *             deliberate choice and is the single most recognisable thing
+ *             in their system.
+ *   cards     22px radius, 0 18px 46px -24px rgba(13,26,43,.22)
+ *   hover     translateY(-4px) with the border going to rgba(86,179,232,.45)
+ */
+
+:root {
+  --accent-2: #3b8ff2;
+  --accent-3: #56b3e8;
+  --r-card: 22px;
+  --shadow-card: 0 1px 2px rgba(13,26,43,.04), 0 18px 46px -24px rgba(13,26,43,.22);
+  --shadow-lift: 0 32px 62px -30px rgba(13,26,43,.42);
+  --edge-hot: rgba(86,179,232,.45);
+}
+
+/* ---- the eyebrow, applied to every micro-label in the product ---- */
+.rail-label,
+.side-card h3,
+.cl-table th,
+.menu-cap,
+.rwhen .rk,
+.panel-head .pn {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.rail-label, .side-card h3, .menu-cap, .rwhen .rk { color: var(--deep-tx); }
+.cl-table th { color: var(--dim); letter-spacing: .18em; }
+.panel-head .pn { letter-spacing: .1em; }
+
+/* Section copy sits on a measured line length, as on their site. */
+.sched-head p, .ov-hero p, .queue-desc { max-width: 60ch; }
+
+/* ---- cards: their radius, depth and lift ---- */
+.panel, .stat, .routine, .side-card, .bubble, .composer {
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+.panel:hover, .routine:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--line-2);
+}
+.stat:hover {
+  transform: translateY(-4px);
+  border-color: var(--edge-hot);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Interactive chrome picks up the same blue edge on hover. */
+.btn:hover        { border-color: var(--edge-hot); transform: translateY(-1px); }
+.btn.primary:hover{ transform: translateY(-1px); }
+.chip:hover       { border-color: var(--edge-hot); }
+.search:focus-within { border-color: var(--accent-3); }
+
+.step { transition: border-color .3s ease, transform .3s ease; }
+.step:hover { border-color: var(--edge-hot); transform: translateY(-2px); }
+
+/* Pills sit slightly rounder to match the 22px card language. */
+.av { border-radius: 14px; }
+.prof-hero .av { border-radius: 20px; }
+
+/* The hero gets their deeper card shadow rather than a generic one. */
+.ov-hero { border-radius: 26px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel:hover, .routine:hover, .stat:hover, .btn:hover, .step:hover {
+    transform: none;
+  }
+}
