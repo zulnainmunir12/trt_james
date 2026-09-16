@@ -653,10 +653,25 @@
         "<span>" + dueTag(c.due) + "</span></button>";
     })).join("");
 
+    // Greeting follows the actual hour — a fixed "Good evening" on a demo
+    // opened at 9am reads as a mock-up straight away.
+    var h = new Date().getHours();
+    var greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+
     pane.innerHTML =
-      '<div class="ov-head"><h1>Good evening, Alex</h1>' +
-      "<p>Here is where things stand across the clinic right now.</p></div>" +
       '<div class="ov-body">' +
+      '<div class="ov-hero"><h1>' + greet + ", Alex</h1>" +
+      "<p>Everything that came in has been read and sorted. " +
+      (held ? "One item was held back for a person to look at."
+            : "Nothing needed a person's judgement today.") + "</p>" +
+      '<div class="hero-meta">' +
+        '<span class="hm"><span class="hmn">' + routed + '</span>' +
+        '<span class="hml">routed automatically</span></span>' +
+        '<span class="hm"><span class="hmn">' + FILTERED.length + '</span>' +
+        '<span class="hml">filtered as noise</span></span>' +
+        '<span class="hm"><span class="hmn">' + DONE.length + '</span>' +
+        '<span class="hml">closed</span></span>' +
+      "</div></div>" +
 
       '<div class="stats">' +
         '<div class="stat info"><div class="sn">' + open + "</div>" +
