@@ -20,6 +20,7 @@ from pathlib import Path
 if __package__ in (None, ""):  # running as a cron script, not an import
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from hermes_trt.notify import send_alert  # noqa: E402
 from hermes_trt.sla import Deadline, SLAStatus, parse_date  # noqa: E402
 from hermes_trt.store import DeadlineStore  # noqa: E402
 
@@ -55,19 +56,33 @@ def format_report(
 
 
 def run(
-    store: DeadlineStore, today: date | None = None, dry_run: bool = False
+    store: DeadlineStore,
+    today: date | None = None,
+    dry_run: bool = False,
+    notify: bool = True,
 ) -> tuple[str, int]:
     """Returns (report, count of newly escalated)."""
     today = today or date.today()
     due_soon, overdue = store.needing_attention(today)
 
+    fresh = [d for d in overdue if not d.escalated]
     newly_escalated = 0
-    for deadline in overdue:
+
+    # Send before recording. If delivery fails we must NOT mark the deadline
+    # escalated, or it will never be alerted again - the sweep skips anything
+    # already flagged. A missed escalation that looks handled is the worst
+    # outcome here.
+    delivery = None
+    if fresh and notify and not dry_run:
+        delivery = send_alert(
+            subject=f"SLA escalation - {len(fresh)} overdue on {today.isoformat()}",
+            body="\n".join(f"  - {d.describe(today)}" for d in fresh),
+        )
+
+    for deadline in fresh:
         # Escalate once. Re-alerting daily on the same ticket trains people
         # to ignore the channel.
-        if deadline.escalated:
-            continue
-        if not dry_run:
+        if not dry_run and (delivery is None or delivery.delivered):
             store.mark_escalated(
                 deadline.ticket_id,
                 deadline.rule_key,
@@ -76,6 +91,7 @@ def run(
                     "client_ref": deadline.client_ref,
                     "rule": deadline.rule.label,
                     "escalate_to": deadline.rule.escalate_to,
+                    "delivered_to": delivery.target if delivery else "not sent",
                 },
             )
         newly_escalated += 1
@@ -95,6 +111,16 @@ def run(
         summary.append("DRY RUN - nothing was recorded.")
     if summary:
         report += "\n\n" + " ".join(summary)
+
+    if delivery:
+        report += f"\nAlert: {delivery.describe()}"
+        if not delivery.delivered:
+            # Say it plainly. A report claiming an escalation happened when
+            # nobody received it is worse than no report.
+            report += (
+                "\nWARNING: nobody was alerted. These deadlines stay flagged "
+                "for the next run rather than being marked escalated."
+            )
 
     return report, newly_escalated
 

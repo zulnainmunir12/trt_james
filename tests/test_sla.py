@@ -173,12 +173,54 @@ def test_sweep_escalates_an_overdue_deadline(tmp_path):
 
 def test_sweep_does_not_escalate_the_same_ticket_twice(tmp_path):
     """Leadership should hear once. Daily repeats train people to ignore
-    the channel."""
+    the channel.
+
+    notify=False stands in for a successful delivery: the point under test
+    is the de-duplication, not the sending.
+    """
     store = DeadlineStore(tmp_path / "sla.db")
     store.add(make())
-    _, first = run(store, date(2026, 3, 1))
-    _, second = run(store, date(2026, 3, 2))
+    _, first = run(store, date(2026, 3, 1), notify=False)
+    _, second = run(store, date(2026, 3, 2), notify=False)
     assert (first, second) == (1, 0)
+
+
+def test_failed_delivery_leaves_the_deadline_unescalated(tmp_path, monkeypatch):
+    """If nobody received the alert, it must be retried.
+
+    Marking it escalated after a failed send would bury it forever - the
+    sweep skips anything already flagged, so the report would say handled
+    while no human ever heard about it.
+    """
+    monkeypatch.setenv("HERMES_TRT_ESCALATION_TARGET", "")
+    monkeypatch.setenv("HERMES_TRT_ALERT_LOG", str(tmp_path / "alerts.log"))
+
+    store = DeadlineStore(tmp_path / "sla.db")
+    store.add(make())
+
+    report, first = run(store, date(2026, 3, 1))
+    assert first == 1
+    assert "NOT DELIVERED" in report
+    assert "nobody was alerted" in report
+    assert store.open_deadlines()[0].escalated is False
+
+    # Still unescalated, so the next sweep tries again.
+    _, second = run(store, date(2026, 3, 2))
+    assert second == 1
+
+
+def test_undelivered_alert_is_written_to_the_fallback_log(tmp_path, monkeypatch):
+    """A file is not a person, but it means the alert is not silently lost."""
+    log = tmp_path / "alerts.log"
+    monkeypatch.setenv("HERMES_TRT_ESCALATION_TARGET", "")
+    monkeypatch.setenv("HERMES_TRT_ALERT_LOG", str(log))
+
+    store = DeadlineStore(tmp_path / "sla.db")
+    store.add(make())
+    run(store, date(2026, 3, 1))
+
+    assert log.exists()
+    assert "OVERDUE" in log.read_text(encoding="utf-8")
 
 
 def test_dry_run_records_nothing(tmp_path):
