@@ -484,3 +484,8 @@ button { cursor: pointer; background: none; border: 0; }
   .ov-head h1 { font-size: 27px; }
 }
 .back-btn { display: none; }
+
+/* A queue that has to be explained in conversation is mislabelled. Each one
+   carries its own one-line description instead. */
+.queue-desc { margin: 6px 18px 0; font-size: 12px; color: var(--dim);
+              line-height: 1.5; max-width: 46ch; }

@@ -59,7 +59,7 @@
     physician: { label: "Physician", colour: "#6aa6f7", tag: "physician" },
     nursing:   { label: "Nursing",   colour: "#a98bf5", tag: "nursing" },
     support:   { label: "Client care", colour: "#37b6c9", tag: "support" },
-    held:      { label: "Needs a person", colour: "#f4736f", tag: "urgent" }
+    held:      { label: "Held for review", colour: "#b02020", tag: "urgent" }
   };
 
   var STAGES = {
@@ -181,21 +181,30 @@
   var QUEUES = [
     { id: "overview",  name: "Overview",      icon: I.home, wide: true,
       test: function () { return true; } },
-    { id: "inbox",     name: "All open",      icon: I.inbox, test: function (m) { return true; } },
-    { id: "held",      name: "Needs a person", icon: I.alert, alert: true,
+    { id: "inbox",     name: "All open",      icon: I.inbox,
+      desc: "Everything currently open, across every queue.",
+      test: function (m) { return true; } },
+    { id: "held",      name: "Held for review", icon: I.alert, alert: true,
+      desc: "Withheld from automatic routing because they need a qualified person's judgement. Nothing here has been answered or assigned.",
       test: function (m) { return m.route === "held"; } },
     { id: "physician", name: "Physician",     icon: I.stethoscope,
+      desc: "Results review, prescribing and clinical assessment.",
       test: function (m) { return m.route === "physician"; } },
     { id: "nursing",   name: "Nursing",       icon: I.nurse,
+      desc: "Client consultations about care already underway.",
       test: function (m) { return m.route === "nursing"; } },
     { id: "support",   name: "Client care",   icon: I.headset,
+      desc: "Membership, billing, logistics and process questions.",
       test: function (m) { return m.route === "support"; } },
     { id: "overdue",   name: "Past due",      icon: I.clock, alert: true,
+      desc: "Past their target date. Leadership has been alerted.",
       test: function (m) { return /overdue/i.test(m.due || ""); } },
     { sep: "Channels" },
     { id: "email",     name: "Client email",  icon: I.inbox,
+      desc: "Everything that arrived by email from clients.",
       test: function (m) { return m.channel === "email"; } },
     { id: "slack",     name: "Internal chat", icon: I.hash,
+      desc: "Requests raised by staff in the clinic's chat channels.",
       test: function (m) { return m.channel === "slack"; } },
     { sep: "Clients" },
     { id: "clients",   name: "All clients",   icon: I.users, wide: true,
@@ -205,8 +214,10 @@
       test: function () { return true; } },
     { sep: "Other" },
     { id: "filtered",  name: "Filtered out",  icon: I.filter, source: "filtered",
+      desc: "Newsletters and automated mail. No task was created, but nothing is deleted.",
       test: function () { return true; } },
     { id: "done",      name: "Closed",        icon: I.check, source: "done",
+      desc: "Completed and closed.",
       test: function () { return true; } }
   ];
 
@@ -260,8 +271,13 @@
 
   function renderList() {
     var rows = visible();
-    var qname = (QUEUES.filter(function (x) { return x.id === state.queue; })[0] || {}).name;
-    $("queue-name").textContent = qname || "Inbox";
+    var q = QUEUES.filter(function (x) { return x.id === state.queue; })[0] || {};
+    $("queue-name").textContent = q.name || "All open";
+    var d = $("queue-desc");
+    if (d) {
+      d.textContent = q.desc || "";
+      d.hidden = !q.desc;
+    }
 
     // One consistent count. Showing "10 items" beside a badge reading "2"
     // made the same queue look like two different sizes.
