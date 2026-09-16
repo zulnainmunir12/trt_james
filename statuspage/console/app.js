@@ -1,313 +1,366 @@
-/* Hermes Ops Console — view routing and live data binding.
+/* Hermes console — bound to the TRT Australia solution design.
  *
- * Panels marked "Live" render from /api/state, which reads the running
- * agent: the kanban board, the deadline store, cron jobs and the safety
- * flags. Panels marked "Illustrative" are static and say so, because
- * pretending we have a client record we cannot reach would be worse than
- * showing the shape of one honestly.
+ * Views mirror the document's sections. Anything labelled Live reads from
+ * /api/state, which queries the running Hermes instance: the ticket
+ * repository, the SLA store, cron services and the enforced safety flags.
+ *
+ * Where a claim in the document is not yet demonstrable, the UI says so
+ * rather than showing a green tick. A demo that overstates what works is
+ * worse than one that is honest about the gaps.
  */
 (function () {
   "use strict";
 
-  var ROLE_LABEL = {
+  var ROLE = {
     physician: "Physician",
-    nursing: "Nursing",
-    support: "Client care",
-    leadership: "Leadership",
-    triage: "A person"
+    nursing: "Nursing Staff",
+    support: "Customer Support",
+    leadership: "Team Leadership",
+    triage: "Held for a person"
   };
 
-  function esc(value) {
-    return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
+  function pill(t, k) { return '<span class="pill p-' + k + '">' + esc(t) + "</span>"; }
+  function roleOf(t) { return t.assignee || "triage"; }
+  function $(id) { return document.getElementById(id); }
 
-  function pill(text, kind) {
-    return '<span class="pill p-' + kind + '">' + esc(text) + "</span>";
-  }
-
-  function roleOf(ticket) {
-    if (!ticket.assignee) return "triage";
-    return ticket.assignee;
-  }
-
-  function rolePill(ticket) {
-    var role = roleOf(ticket);
-    return pill(ROLE_LABEL[role] || ticket.assignee, role);
-  }
-
-  /* ------------------------------------------------------------ routing */
+  /* --------------------------------------------------------- routing */
 
   function show(name) {
     var links = document.querySelectorAll(".nav a");
     for (var i = 0; i < links.length; i++) {
       var on = links[i].getAttribute("data-view") === name;
       links[i].classList.toggle("active", on);
-      if (on) links[i].setAttribute("aria-current", "page");
-      else links[i].removeAttribute("aria-current");
+      if (on) {
+        links[i].setAttribute("aria-current", "page");
+        $("view-sec").textContent = links[i].getAttribute("data-sec");
+        $("view-title").innerHTML = links[i].getAttribute("data-title");
+      } else {
+        links[i].removeAttribute("aria-current");
+      }
     }
     var views = document.querySelectorAll(".view");
     for (var j = 0; j < views.length; j++) {
       views[j].classList.toggle("active", views[j].id === "v-" + name);
     }
-    var link = document.querySelector('.nav a[data-view="' + name + '"]');
-    document.getElementById("view-title").textContent =
-      link ? link.textContent.trim().replace(/\s*\d+$/, "") : "Overview";
-    document.getElementById("main").scrollTop = 0;
+    $("main").scrollTop = 0;
   }
-
-  function routeFromHash() {
-    var name = (location.hash || "#overview").slice(1);
-    if (!document.getElementById("v" + "-" + name)) name = "overview";
-    show(name);
+  function route() {
+    var n = (location.hash || "#architecture").slice(1);
+    if (!$("v-" + n)) n = "architecture";
+    show(n);
   }
+  window.addEventListener("hashchange", route);
 
-  window.addEventListener("hashchange", routeFromHash);
+  /* ------------------------------------------------- §2 capabilities */
 
-  /* --------------------------------------------------------------- data */
+  var CAPS = [
+    ["Cron Scheduler",
+     "Executes automated monthly client check-in workflows and SLA deadline monitoring jobs without manual intervention.",
+     "demo", "Scheduler verified firing; SLA sweep registered daily"],
+    ["Multi-Platform Gateway",
+     "Provides unified interfaces across chat, email and internal messaging platforms within a single process architecture.",
+     "part", "Email gateway configured; internal chat awaiting access"],
+    ["MCP Connectors",
+     "Facilitates bi-directional API integrations with ticketing systems, CRM databases and pathology record systems.",
+     "todo", "Requires CRM and pathology credentials"],
+    ["Subagent Architecture",
+     "Enables parallel execution and isolated domain handling across clinical, nursing and support sub-tasks.",
+     "held", "Deliberately disabled — see Compliance"],
+    ["Persistent State Memory",
+     "Maintains historical context for client records and active tickets across sessions, supporting long-term tracking.",
+     "demo", "Obligations persist across restarts with an audit trail"],
+    ["Provider-Agnostic LLM Layer",
+     "Allows model selection adjustments without code refactoring.",
+     "demo", "Model switched between providers with no code change"],
+    ["Self-Hosted / Open Source",
+     "Deploys within dedicated enterprise infrastructure, eliminating external licensing fees and ensuring data sovereignty.",
+     "demo", "Running self-hosted; no licensing cost"]
+  ];
+  var CAP_PILL = {
+    demo: ["Demonstrated", "ok"], part: ["Partial", "warn"],
+    todo: ["Not started", "mute"], held: ["Intentionally off", "bad"]
+  };
 
-  function setLive(ok) {
-    document.getElementById("live-dot").className = ok ? "dot" : "dot off";
-    document.getElementById("live-text").textContent =
-      ok ? "Agent running" : "Agent stopped";
-  }
-
-  function renderActivity(tickets) {
-    var body = document.getElementById("t-activity");
-    if (!tickets.length) {
-      body.innerHTML = '<tr><td colspan="4" class="mono">No tickets yet.</td></tr>';
-      return;
-    }
-    body.innerHTML = tickets.slice(0, 8).map(function (t) {
-      var held = !t.assignee;
-      return "<tr>" +
-        '<td class="mono">' + esc(t.id) + "</td>" +
-        '<td class="truncate">' + esc(t.title) + "</td>" +
-        "<td>" + rolePill(t) + "</td>" +
-        "<td>" + pill(held ? "Held" : "Assigned", held ? "warn" : "ok") + "</td>" +
-        "</tr>";
+  function renderCaps() {
+    $("t-caps").innerHTML = CAPS.map(function (c) {
+      var p = CAP_PILL[c[2]];
+      return "<tr><td><strong>" + esc(c[0]) + "</strong></td><td>" + esc(c[1]) +
+        '<div class="src" style="margin-top:5px">' + esc(c[3]) + "</div></td>" +
+        "<td>" + pill(p[0], p[1]) + "</td></tr>";
     }).join("");
   }
 
-  function renderAttention(state) {
-    var held = state.tickets.filter(function (t) { return !t.assignee; });
-    var over = state.deadlines.filter(function (d) { return d.status === "overdue"; });
-    var soon = state.deadlines.filter(function (d) { return d.status === "due_soon"; });
-    var out = [];
+  /* ----------------------------------------------------- §3 workflow */
 
-    if (over.length) {
-      out.push('<div class="field"><span class="k">' + pill("Overdue", "bad") +
-        " " + over.length + " deadline" + (over.length === 1 ? "" : "s") +
-        '</span><span class="v src">Leadership alerted</span></div>');
-    }
-    if (soon.length) {
-      out.push('<div class="field"><span class="k">' + pill("Due soon", "warn") +
-        " " + soon.length + " approaching</span>" +
-        '<span class="v src">Within the warning window</span></div>');
-    }
-    held.forEach(function (t) {
-      out.push('<div class="field"><span class="k">' + pill("For a person", "bad") +
-        " " + esc(t.title.slice(0, 46)) + '</span><span class="v src">Not assigned</span></div>');
-    });
-    if (!out.length) {
-      out.push('<p class="src" style="margin:4px 0">Nothing needs attention.</p>');
-    }
-    document.getElementById("t-attention").innerHTML = out.join("");
+  function renderStages(state) {
+    var tickets = state.tickets || [];
+    var held = tickets.filter(function (t) { return !t.assignee; });
+    var over = (state.deadlines || []).filter(function (d) { return d.status === "overdue"; });
+
+    var stages = [
+      ["1", "Ingestion",
+       "The assistant continuously monitors internal communications and the client mailbox for actionable requests.",
+       "Email gateway configured against a test mailbox. Internal chat awaits workspace access.", false],
+      ["2", "Ticket Generation",
+       "Generates a structured record capturing task description, client association, priority level and target completion date.",
+       tickets.length + " ticket instance" + (tickets.length === 1 ? "" : "s") +
+       " currently held in the repository, each carrying the reasoning that produced it.", false],
+      ["3", "Taxonomic Routing",
+       "A classification step routes the record to the appropriate domain handler — Physician, Nursing Staff or Customer Support.",
+       "Routing verified against a labelled test set. Administrative, clinical and noise cases separated correctly.", false],
+      ["✋", "Clinical decision boundary",
+       "Anything requiring clinical judgement, and anything the assistant is not confident about, is withheld from automated routing and given to a qualified person.",
+       held.length + " item" + (held.length === 1 ? "" : "s") +
+       " currently held for a person. No clinical assessment or client reply is ever generated.", true],
+      ["4", "SLA Tracking",
+       "An automated routine regularly audits open tickets against operational deadlines.",
+       (state.deadlines || []).length + " obligation" +
+       ((state.deadlines || []).length === 1 ? "" : "s") +
+       " tracked, audited daily by the scheduler.", false],
+      ["5", "Management Escalation",
+       "Identifies target completion risks and dispatches automated alerts to Team Leadership via established communication channels.",
+       over.length ? over.length + " past target and escalated."
+         : "Nothing past target. Alerts route to leadership once the chat workspace is connected.", false]
+    ];
+
+    $("stages").innerHTML = stages.map(function (s) {
+      return '<article class="stage' + (s[4] ? " guard" : "") + '">' +
+        '<div class="num">' + s[0] + "</div><div>" +
+        "<h3>" + esc(s[1]) + "</h3><p>" + esc(s[2]) + "</p>" +
+        '<div class="evid">' + esc(s[3]) + "</div></div></article>";
+    }).join("");
   }
+
+  /* ------------------------------------------------------ §5 roadmap */
+
+  var PHASES = [
+    [1, "Deployment of Hermes core framework; integration of messaging and ticketing interfaces; initial routing configuration.",
+     "Automated conversion and routing of requests to structured tickets.", "part", 75,
+     "Core deployed, ticket repository operating, routing verified. Messaging integration pending client systems."],
+    [2, "Implementation of SLA tracking service and automated leadership escalation alerts.",
+     "Automated deadline tracking and exception management.", "part", 70,
+     "Tracking, escalation logic and audit trail complete. Alert delivery pending a chat channel."],
+    [3, "Integration of monthly check-in routines and inbound response parsing workflow.",
+     "Systematic, scheduled client outreach execution.", "todo", 10,
+     "Scheduler proven. Requires the client mailbox and approved template copy."],
+    [4, "Deployment of pathology and follow-up monitoring services.",
+     "Automated tracking and auditing of clinical follow-up requirements.", "todo", 30,
+     "Obligation rules derived from the clinic's published care standards. Requires pathology data access."]
+  ];
+
+  function renderPhases() {
+    $("phases").innerHTML = PHASES.map(function (p) {
+      var label = p[3] === "done" ? "Complete" : p[3] === "part" ? "In progress" : "Not started";
+      var kind  = p[3] === "done" ? "ok" : p[3] === "part" ? "warn" : "mute";
+      return '<article class="phase ' + p[3] + '">' +
+        '<div class="pn">' + p[0] + "</div>" +
+        "<div><h3>Phase " + p[0] + "</h3><p>" + esc(p[1]) + "</p>" +
+        '<div class="cap"><strong>Capability:</strong> ' + esc(p[2]) + "</div>" +
+        '<div class="src" style="margin-top:6px">' + esc(p[5]) + "</div></div>" +
+        '<div><div class="bar ' + p[3] + '"><i style="width:' + p[4] + '%"></i></div>' +
+        pill(label, kind) + "</div></article>";
+    }).join("");
+  }
+
+  /* --------------------------------------------------- §6 compliance */
+
+  var COMMITMENTS = [
+    ["On-premise / private cloud hosting",
+     "Deployed on internal infrastructure so client data remains within the corporate security perimeter.",
+     "part", "Hermes runs self-hosted. Connected systems chosen by the clinic sit outside that perimeter and should be reflected in the final wording."],
+    ["Data minimisation",
+     "Components operate under least-privilege access, exposing only data required for the task.",
+     "part", "Enforced for the scheduled routines. Extends to integrations as they are connected."],
+    ["Human-in-the-loop safeguards",
+     "Explicit approval gates for privileged or sensitive operational tasks.",
+     "ok", "Clinical and low-confidence items are withheld from automated routing and given to a person."],
+    ["Comprehensive audit logging",
+     "Every transaction, decision path and systemic action captured in immutable logs.",
+     "ok", "Obligations, escalations and completions are written to an append-only record."],
+    ["Human decision authority",
+     "Autonomous execution of clinical or discretionary client decisions is prohibited.",
+     "ok", "Autonomous task execution is disabled and verified on every build. The assistant composes no client replies."]
+  ];
+
+  var TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  var PART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/></svg>';
+
+  function renderCompliance() {
+    $("t-compliance").innerHTML = COMMITMENTS.map(function (c) {
+      var ok = c[2] === "ok";
+      return '<div class="ctrl"><span style="color:' + (ok ? "var(--ok)" : "var(--warn)") + '">' +
+        (ok ? TICK : PART) + "</span><div>" +
+        '<div class="t">' + esc(c[0]) + "</div>" +
+        '<div class="d">' + esc(c[1]) + "</div>" +
+        '<div class="src" style="margin-top:5px">' + esc(c[3]) + "</div></div>" +
+        "<span>" + pill(ok ? "Enforced" : "Partial", ok ? "ok" : "warn") + "</span></div>";
+    }).join("");
+  }
+
+  function renderSafety(flags) {
+    $("t-safety").innerHTML = Object.keys(flags).map(function (k) {
+      var off = flags[k] === "false";
+      return '<div class="field"><span class="k">' + esc(k) + "</span><span>" +
+        pill(off ? "Disabled" : String(flags[k]), off ? "ok" : "warn") + "</span></div>";
+    }).join("");
+  }
+
+  /* ------------------------------------------------------- live views */
 
   function renderBoard(tickets) {
     var lanes = ["physician", "nursing", "support", "triage"];
-    document.getElementById("board").innerHTML = lanes.map(function (lane) {
+    $("board").innerHTML = lanes.map(function (lane) {
       var items = tickets.filter(function (t) { return roleOf(t) === lane; });
-      var cards = items.length
-        ? items.map(function (t) {
-            return '<article class="tkt l-' + lane + '">' +
-              '<div class="ti">' + esc(t.title) + "</div>" +
-              '<div class="tm"><span class="id">' + esc(t.id) + "</span>" +
-              pill(t.status === "triage" ? "Awaiting a person" : "Ready",
-                   t.status === "triage" ? "warn" : "ok") +
-              "</div></article>";
-          }).join("")
-        : '<div class="lane-empty">Nothing here</div>';
-      return '<section class="lane"><div class="lane-head">' +
-        '<span class="nm">' + ROLE_LABEL[lane] + "</span>" +
-        '<span class="ct">' + items.length + "</span></div>" +
+      var cards = items.length ? items.map(function (t) {
+        return '<article class="tkt l-' + lane + '"><div class="ti">' + esc(t.title) + "</div>" +
+          '<div class="tm"><span class="id">' + esc(t.id) + "</span>" +
+          pill(t.status === "triage" ? "Awaiting a person" : "Open",
+               t.status === "triage" ? "warn" : "ok") + "</div></article>";
+      }).join("") : '<div class="lane-empty">No tickets</div>';
+      return '<section class="lane"><div class="lane-head"><span class="nm">' +
+        ROLE[lane] + '</span><span class="ct">' + items.length + "</span></div>" +
         '<div class="lane-body">' + cards + "</div></section>";
     }).join("");
   }
 
   function renderSla(deadlines) {
-    var body = document.getElementById("t-sla");
-    if (!deadlines.length) {
-      body.innerHTML = '<tr><td colspan="6" class="mono">No deadlines tracked yet.</td></tr>';
-      return;
-    }
-    body.innerHTML = deadlines.map(function (d) {
+    $("t-sla").innerHTML = deadlines.length ? deadlines.map(function (d) {
       var kind = d.status === "overdue" ? "bad" : d.status === "due_soon" ? "warn" : "ok";
-      var label = d.status === "overdue" ? "Overdue"
-                : d.status === "due_soon" ? "Due soon" : "On track";
-      var remaining = d.days < 0 ? Math.abs(d.days) + "d late"
-                    : d.days === 0 ? "today" : "in " + d.days + "d";
-      return "<tr>" +
-        '<td class="mono">' + esc(d.ticket) + "</td>" +
-        "<td>" + esc(d.rule) +
-          (d.provisional ? " " + pill("Not yet agreed", "bad") : "") + "</td>" +
-        '<td class="truncate">' + esc(d.client) + "</td>" +
-        '<td class="mono">' + esc(d.due) + "</td>" +
-        "<td>" + esc(remaining) + "</td>" +
-        "<td>" + pill(label, kind) + "</td></tr>";
-    }).join("");
+      var label = d.status === "overdue" ? "Past target"
+                : d.status === "due_soon" ? "Approaching" : "On track";
+      var rem = d.days < 0 ? Math.abs(d.days) + " days late"
+              : d.days === 0 ? "today" : d.days + " days";
+      return '<tr><td class="mono">' + esc(d.ticket) + "</td><td>" + esc(d.rule) +
+        (d.provisional ? " " + pill("Standard not supplied", "bad") : "") +
+        '</td><td class="truncate">' + esc(d.client) + '</td><td class="mono">' +
+        esc(d.due) + "</td><td>" + esc(rem) + "</td><td>" + pill(label, kind) + "</td></tr>";
+    }).join("") : '<tr><td colspan="6" class="mono">No obligations tracked.</td></tr>';
   }
 
-  function renderRules(rules) {
-    document.getElementById("t-rules").innerHTML = rules.map(function (r) {
-      return "<tr><td>" + esc(r.label) +
-        (r.provisional ? " " + pill("Not yet agreed", "bad") : "") + "</td>" +
-        "<td>" + r.days + " days</td>" +
-        "<td>" + r.warn + " days before</td>" +
-        '<td class="src">' + esc(r.source) + "</td></tr>";
-    }).join("");
-  }
+  var INBOX = [
+    { from: "m.reed@example.com", when: "today, 09:14", subject: "Blood test results attached",
+      body: "Hi, I had the private panel done on Tuesday. Results came through this morning, attached. Full name is Michael Reed, DOB 12/05/1984. Can someone take a look and let me know the next step?",
+      attachment: "reed-pathology-2026-09-14.pdf", route: "physician", priority: "Normal",
+      confidence: .95, ticket: "t_75a36bd7",
+      reason: "Pathology results submitted for assessment. Requires a practitioner; the assistant verified only that the required markers are present." },
+    { from: "a.brennan@example.com", when: "today, 08:51", subject: "GP results — is this enough?",
+      body: "My GP ran bloods last month but I'm not sure they did all of the ones on your list. I've attached what came back. Do I need to get more done before booking?",
+      attachment: "brennan-gp-panel.pdf", route: "support", priority: "Normal",
+      confidence: .95, ticket: "t_52227d97",
+      reason: "Checking which required markers are present is administrative. Whether the panel is clinically sufficient is for the practitioner." },
+    { from: "r.santos@example.com", when: "today, 08:02", subject: "Chest tightness since starting",
+      body: "I've had some tightness in my chest the last couple of days and I'm a bit worried. I started treatment about five weeks ago. Should I stop?",
+      attachment: null, route: "triage", priority: "Urgent", confidence: 1, ticket: "t_f37be0d8",
+      reason: "Client reports a physical symptom and asks whether to stop treatment.",
+      override: "Withheld from automated routing and given to a qualified person. No assessment, advice or reply was produced." },
+    { from: "d.whitcombe@example.com", when: "yesterday, 16:40", subject: "Changing my billing to yearly",
+      body: "I'm on the quarterly membership and want to switch to yearly before my next renewal. What does the difference work out to, and is testing included?",
+      attachment: null, route: "support", priority: "Low", confidence: 1, ticket: "t_a2fd925d",
+      reason: "Membership enquiry. The testing-inclusion question is one the clinic requires client care to confirm, so no figure was quoted." },
+    { from: "news@industry-digest.example.com", when: "yesterday, 06:00",
+      subject: "Your weekly industry digest",
+      body: "This week in men's health: five trends to watch. Click here to read more. Unsubscribe.",
+      attachment: null, route: "support", priority: "Low", confidence: 1, ticket: "— none —",
+      reason: "Marketing email. No ticket was generated; not every inbound communication is work." }
+  ];
 
-  function renderSafety(flags) {
-    var rows = Object.keys(flags).map(function (k) {
-      var off = flags[k] === "false";
-      return '<div class="field"><span class="k">' + esc(k) + "</span>" +
-        '<span class="v">' + pill(off ? "Disabled" : flags[k], off ? "ok" : "warn") +
-        "</span></div>";
-    });
-    document.getElementById("t-safety").innerHTML = rows.join("");
-  }
-
-  function renderInbox(messages) {
-    document.getElementById("inbox-list").innerHTML = messages.map(function (m) {
+  function renderInbox() {
+    $("inbox-list").innerHTML = INBOX.map(function (m) {
       var pct = Math.round(m.confidence * 100);
-      return '<article class="msg">' +
-        "<div>" +
-          '<div class="msg-from">' + esc(m.from) + " &middot; " + esc(m.when) + "</div>" +
-          '<div class="msg-subj">' + esc(m.subject) + "</div>" +
-          '<div class="msg-body">' + esc(m.body) + "</div>" +
-          (m.attachment
-            ? '<div class="src" style="margin-top:7px">Attachment: ' + esc(m.attachment) + "</div>"
-            : "") +
-        "</div>" +
-        '<aside class="verdict"><h4>Assessment</h4>' +
-          '<div class="vrow"><span class="k">Routed to</span>' + pill(ROLE_LABEL[m.route], m.route) + "</div>" +
-          '<div class="vrow"><span class="k">Priority</span>' +
-            pill(m.priority, m.priority === "Urgent" ? "bad"
-                 : m.priority === "Low" ? "mute" : "info") + "</div>" +
-          '<div class="vrow"><span class="k">Confidence</span>' +
-            '<span class="meter" role="img" aria-label="Confidence ' + pct + ' percent">' +
-            '<i style="width:' + pct + '%"></i></span>' +
-            '<span class="src">' + pct + "%</span></div>" +
-          '<div class="vrow"><span class="k">Ticket</span><span class="mono">' +
-            esc(m.ticket) + "</span></div>" +
-          '<div class="vreason">' + esc(m.reason) + "</div>" +
-          (m.override ? '<div class="override">' + esc(m.override) + "</div>" : "") +
+      var kind = m.route === "triage" ? "bad" : m.route === "physician" ? "engine" : "role";
+      return '<article class="msg"><div>' +
+        '<div class="msg-from">' + esc(m.from) + " &middot; " + esc(m.when) + "</div>" +
+        '<div class="msg-subj">' + esc(m.subject) + "</div>" +
+        '<div class="msg-body">' + esc(m.body) + "</div>" +
+        (m.attachment ? '<div class="src" style="margin-top:7px">Attachment: ' +
+          esc(m.attachment) + "</div>" : "") + "</div>" +
+        '<aside class="verdict"><h4>Interpretation</h4>' +
+        '<div class="vrow"><span class="k">Routed to</span>' + pill(ROLE[m.route], kind) + "</div>" +
+        '<div class="vrow"><span class="k">Priority</span>' +
+          pill(m.priority, m.priority === "Urgent" ? "bad" : m.priority === "Low" ? "mute" : "role") + "</div>" +
+        '<div class="vrow"><span class="k">Confidence</span>' +
+          '<span class="meter" role="img" aria-label="Confidence ' + pct + ' percent">' +
+          '<i style="width:' + pct + '%"></i></span><span class="src">' + pct + "%</span></div>" +
+        '<div class="vrow"><span class="k">Record</span><span class="mono">' + esc(m.ticket) + "</span></div>" +
+        '<div class="vreason">' + esc(m.reason) + "</div>" +
+        (m.override ? '<div class="override">' + esc(m.override) + "</div>" : "") +
         "</aside></article>";
     }).join("");
   }
 
-  /* ------------------------------------------------------- illustrative */
+  /* -------------------------------------------------------------- boot */
 
-  var INBOX = [
-    {
-      from: "m.reed@example.com", when: "today, 09:14",
-      subject: "Blood test results attached",
-      body: "Hi, I had the private panel done on Tuesday. Results came through this morning, attached. Full name is Michael Reed, DOB 12/05/1984. Can someone take a look and let me know the next step?",
-      attachment: "reed-pathology-2026-09-14.pdf",
-      route: "physician", priority: "Normal", confidence: 0.95, ticket: "t_75a36bd7",
-      reason: "Pathology results submitted for assessment. Requires a practitioner to review; the assistant has checked only that the required markers are present."
-    },
-    {
-      from: "a.brennan@example.com", when: "today, 08:51",
-      subject: "GP results — is this enough?",
-      body: "My GP ran bloods last month but I'm not sure they did all of the ones on your list. I've attached what came back. Do I need to go and get more done before booking?",
-      attachment: "brennan-gp-panel.pdf",
-      route: "support", priority: "Normal", confidence: 0.95, ticket: "t_52227d97",
-      reason: "Checking which required markers are present or missing is administrative. Whether the panel is clinically sufficient is for the practitioner."
-    },
-    {
-      from: "r.santos@example.com", when: "today, 08:02",
-      subject: "Chest tightness since starting",
-      body: "I've had some tightness in my chest the last couple of days and I'm a bit worried. I started treatment about five weeks ago. Should I stop?",
-      attachment: null,
-      route: "triage", priority: "Urgent", confidence: 1.0, ticket: "t_f37be0d8",
-      reason: "Client reports a physical symptom and asks whether to stop treatment.",
-      override: "Held for a qualified person. No assessment, advice or reply was produced."
-    },
-    {
-      from: "d.whitcombe@example.com", when: "yesterday, 16:40",
-      subject: "Changing my billing to yearly",
-      body: "I'm on the quarterly membership at the moment and want to switch to the yearly one before my next renewal. Can you tell me what the difference works out to and whether the testing is included?",
-      attachment: null,
-      route: "support", priority: "Low", confidence: 1.0, ticket: "t_a2fd925d",
-      reason: "Membership and billing enquiry. The testing-inclusion question is one the clinic requires client care to confirm, so no figure was quoted."
-    },
-    {
-      from: "news@industry-digest.example.com", when: "yesterday, 06:00",
-      subject: "Your weekly industry digest",
-      body: "This week in men's health: five trends to watch. Click here to read more. Unsubscribe.",
-      attachment: null,
-      route: "support", priority: "Low", confidence: 1.0, ticket: "— none —",
-      reason: "Marketing email. No ticket was created; not every inbound message is work.",
-      override: null
-    }
-  ];
+  function setLive(ok) {
+    $("live-dot").className = ok ? "dot" : "dot off";
+    $("live-text").textContent = ok ? "Engine running" : "Engine stopped";
+  }
 
-  /* --------------------------------------------------------------- boot */
+  function text(id, value) { var el = $(id); if (el) el.textContent = value; }
 
   function load() {
     fetch("/api/state", { cache: "no-store" })
       .then(function (r) { return r.json(); })
-      .then(function (state) {
-        setLive(state.gateway);
+      .then(function (s) {
+        setLive(s.gateway);
+        var tickets = s.tickets || [], deads = s.deadlines || [], cron = s.cron || [];
+        var byRole = function (r) {
+          return tickets.filter(function (t) { return roleOf(t) === r; }).length;
+        };
+        var held = byRole("triage");
+        var over = deads.filter(function (d) { return d.status === "overdue"; }).length;
+        var soon = deads.filter(function (d) { return d.status === "due_soon"; }).length;
 
-        var tickets = state.tickets || [];
-        var deadlines = state.deadlines || [];
-        var held = tickets.filter(function (t) { return !t.assignee; }).length;
-        var over = deadlines.filter(function (d) { return d.status === "overdue"; }).length;
-        var soon = deadlines.filter(function (d) { return d.status === "due_soon"; }).length;
+        /* architecture diagram — live counts on the nodes */
+        text("a-tickets", tickets.length + " active");
+        text("a-email", "test mailbox connected");
+        text("a-engine", s.gateway ? "operating" : "stopped");
+        text("a-physician", byRole("physician") + " assigned");
+        text("a-nursing", byRole("nursing") + " assigned");
+        text("a-support", byRole("support") + " assigned");
+        text("a-leadership", over + " escalation" + (over === 1 ? "" : "s"));
 
-        document.getElementById("k-today").textContent = tickets.length;
-        document.getElementById("k-today-sub").textContent =
-          tickets.length ? "From the live ticket store" : "No activity yet";
-        document.getElementById("k-open").textContent = tickets.length;
-        document.getElementById("k-open-sub").textContent =
-          (tickets.length - held) + " assigned, " + held + " held";
-        document.getElementById("k-human").textContent = held;
-        document.getElementById("k-overdue").textContent = over;
-        document.getElementById("k-overdue-sub").textContent =
-          over ? "Leadership alerted" : "Nothing past due";
+        text("k-open", tickets.length);
+        text("k-open-sub", (tickets.length - held) + " routed, " + held + " held");
+        text("k-human", held);
+        text("k-sla", deads.length);
+        text("k-esc", over);
+        text("k-esc-sub", over ? "Leadership alerted" : "Nothing past target");
 
-        document.getElementById("c-inbox").textContent = INBOX.length;
-        document.getElementById("c-tickets").textContent = tickets.length;
-        document.getElementById("c-sla").textContent = deadlines.length;
+        text("c-inbox", INBOX.length);
+        text("c-tickets", tickets.length);
+        text("c-sla", deads.length);
+        text("s-tracked", deads.length);
+        text("s-soon", soon);
+        text("s-over", over);
 
-        document.getElementById("s-tracked").textContent = deadlines.length;
-        document.getElementById("s-soon").textContent = soon;
-        document.getElementById("s-over").textContent = over;
+        var job = cron[0];
+        $("r1-status").innerHTML = pill("Awaiting mailbox & templates", "mute");
+        $("r2-status").innerHTML = cron.length ? pill("Scheduled", "ok") : pill("Not scheduled", "warn");
+        if (job) {
+          text("r2-sched", job.schedule || "Daily interval");
+          text("sla-note", "Next audit " + (job.next || "—"));
+        }
+        $("t-sweep").innerHTML = "<tr><td>" + esc(job && job.next ? "Next: " + job.next : "—") +
+          "</td><td>" + deads.length + "</td><td>" + soon + "</td><td>" + over + "</td></tr>";
 
-        renderActivity(tickets);
-        renderAttention({ tickets: tickets, deadlines: deadlines });
+        renderStages(s);
         renderBoard(tickets);
-        renderSla(deadlines);
-        renderRules(state.rules || []);
-        renderSafety(state.safety || {});
-
-        document.getElementById("i-engine").innerHTML =
-          pill(state.gateway ? "Operating" : "Stopped", state.gateway ? "ok" : "bad");
-        document.getElementById("i-cron").innerHTML =
-          (state.cron || []).length ? pill("Operating", "ok") : pill("No jobs", "warn");
+        renderSla(deads);
+        renderSafety(s.safety || {});
       })
-      .catch(function () {
-        setLive(false);
-      });
+      .catch(function () { setLive(false); });
   }
 
-  renderInbox(INBOX);
-  routeFromHash();
+  renderCaps();
+  renderPhases();
+  renderCompliance();
+  renderInbox();
+  route();
   load();
   setInterval(load, 20000);
 })();
