@@ -689,3 +689,11 @@ body {
     transform: none;
   }
 }
+
+/* Search result group headings. */
+.res-head {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .24em;
+  text-transform: uppercase; font-weight: 600; color: var(--deep-tx);
+  padding: 14px 18px 8px; background: var(--raised);
+  border-bottom: 1px solid var(--line);
+}

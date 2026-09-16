@@ -1041,6 +1041,10 @@
     state.queue = b.getAttribute("data-q");
     state.selected = null;
     state.client = null;
+    state.searching = false;
+    state.q = "";
+    $("search").value = "";
+    document.querySelector(".filters").hidden = false;
     render();
   });
 
@@ -1050,7 +1054,7 @@
     state.selected = b.getAttribute("data-id");
     var m = current();
     if (m) m.unread = false;
-    render();
+    if (state.searching) { renderSearch(); } else { render(); }
   });
 
   var STAGE_CHIPS = { "f-todo": "todo", "f-progress": "progress", "f-waiting": "waiting" };
@@ -1079,16 +1083,106 @@
     this.setAttribute("aria-pressed", state.urgentOnly);
     renderList();
   };
+  // Global search. It previously only filtered the conversation list, which
+  // is hidden on Overview, Clients and Schedule - so on those views typing
+  // did nothing at all. Searching now takes over the middle column
+  // regardless of where you were, and covers clients as well as messages.
   $("search").addEventListener("input", function () {
     state.q = this.value.trim();
-    renderList();
+    if (state.q) {
+      state.searching = true;
+      document.querySelector(".app").classList.remove("wide");
+      renderSearch();
+    } else {
+      state.searching = false;
+      render();
+    }
   });
+
+  function searchResults() {
+    var n = state.q.toLowerCase();
+    var msgs = DATA.concat(FILTERED, DONE).filter(function (m) {
+      return (m.from + " " + m.subject + " " + m.body + " " + (m.addr || ""))
+        .toLowerCase().indexOf(n) > -1;
+    });
+    var people = CLIENTS.filter(function (c) {
+      return (c.name + " " + c.email + " " + c.next).toLowerCase().indexOf(n) > -1;
+    });
+    return { msgs: msgs, people: people };
+  }
+
+  function renderSearch() {
+    var r = searchResults();
+    var total = r.msgs.length + r.people.length;
+
+    $("queue-name").textContent = "Search";
+    $("queue-count").textContent = total + (total === 1 ? " result" : " results");
+    var d = $("queue-desc");
+    if (d) { d.textContent = "Matching “" + state.q + "”"; d.hidden = false; }
+
+    // Stage filters make no sense across a mixed result set.
+    document.querySelector(".filters").hidden = true;
+
+    if (!total) {
+      $("list").innerHTML = '<div class="empty">' + svg(I.search) +
+        "<div>Nothing matches " + esc(state.q) + ".</div></div>";
+      renderPane();
+      return;
+    }
+
+    var out = "";
+    if (r.people.length) {
+      out += '<div class="res-head">Clients</div>' + r.people.map(function (c) {
+        return '<button class="item" data-client="' + esc(c.name) + '">' +
+          '<span class="av" style="background:' + hue(c.name) + '" aria-hidden="true">' +
+            esc(initials(c.name)) + "</span><span>" +
+          '<span class="it-top"><span class="it-from">' + esc(c.name) + "</span></span>" +
+          '<div class="it-prev">' + esc(c.email) + " · " + esc(c.next) + "</div>" +
+          '<div class="it-meta">' + dueTag(c.due) + "</div></span></button>";
+      }).join("");
+    }
+    if (r.msgs.length) {
+      out += '<div class="res-head">Conversations</div>' + r.msgs.map(function (m) {
+        var t = m.route ? TEAM[m.route] : null;
+        return '<button class="item" data-id="' + m.id + '" aria-current="' +
+          (state.selected === m.id) + '">' +
+          '<span class="av' + (m.channel === "slack" ? " slack" : "") +
+            '" style="background:' + hue(m.from) + '" aria-hidden="true">' +
+            esc(initials(m.from)) + "</span><span>" +
+          '<span class="it-top"><span class="it-from">' + esc(m.from) + "</span>" +
+          '<span class="it-time">' + esc(m.time) + "</span></span>" +
+          '<div class="it-subj">' + esc(m.subject) + "</div>" +
+          '<div class="it-prev">' + esc(m.body.replace(/\n+/g, " ").slice(0, 100)) + "</div>" +
+          '<div class="it-meta">' + (m.filtered ? "" : stageTag(m)) +
+            (t ? tag(t.label, t.tag) : "") + "</div></span></button>";
+      }).join("");
+    }
+    $("list").innerHTML = out;
+
+    $("list").querySelectorAll("[data-client]").forEach(function (b) {
+      b.onclick = function () {
+        state.q = ""; state.searching = false; $("search").value = "";
+        state.queue = "clients"; state.client = b.getAttribute("data-client");
+        document.querySelector(".filters").hidden = false;
+        render();
+      };
+    });
+    renderPane();
+  }
 
   document.addEventListener("keydown", function (e) {
     if (e.key === "/" && document.activeElement !== $("search")) {
       e.preventDefault(); $("search").focus();
     }
-    if (e.key === "Escape") { closeMenus(); $("search").blur(); }
+    if (e.key === "Escape") {
+      closeMenus();
+      if (state.searching) {
+        state.q = ""; state.searching = false; $("search").value = "";
+        document.querySelector(".filters").hidden = false;
+        render();
+      }
+      $("search").blur();
+    }
   });
 
   /* ------------------------------------------ live arrival + clock */
