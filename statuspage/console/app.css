@@ -489,3 +489,19 @@ button { cursor: pointer; background: none; border: 0; }
    carries its own one-line description instead. */
 .queue-desc { margin: 6px 18px 0; font-size: 12px; color: var(--dim);
               line-height: 1.5; max-width: 46ch; }
+
+/* ------------------------------------------------- brand (real logo) */
+
+/* The supplied wordmark carries "AUSTRALIA" in white beneath the blue TRT,
+   which is invisible on a light header. Cropped to the blue mark and paired
+   with a text label, which is how the mark is used on their own site. */
+.brand-logo {
+  height: 30px; width: auto; display: block; flex: none;
+  object-fit: cover; object-position: top center;
+  aspect-ratio: 1100 / 330;          /* drops the white lower band */
+}
+.brand-div { width: 1px; height: 24px; background: var(--line-2); flex: none; }
+.brand .brand-s {
+  font-family: var(--display); font-size: 10.5px; font-weight: 600;
+  line-height: 1.22; color: var(--dim); letter-spacing: .02em; margin: 0;
+}
