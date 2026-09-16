@@ -18,6 +18,25 @@ Failure behaviour, deliberately:
   - Anything we could not process is written to a dead-letter file so it is
     visible rather than silently dropped.
 
+IMPORTANT - why "always skip" is load-bearing rather than belt-and-braces:
+
+Hermes warns at startup that `fail_closed` is IGNORED for this event:
+
+    hooks.pre_gateway_dispatch[0].fail_closed=true will be ignored at
+    runtime - fail_closed only applies to blocking-capable events
+    (pre_tool_call).
+
+So the platform will NOT stop a message reaching the agent if this hook
+crashes, times out, or is killed. The only protection is that this script
+prints a skip under every circumstance it can still print at all - hence
+the bare excepts, and hence printing the skip from a finally-style path
+rather than only on the happy route.
+
+This is a gap worth raising with the client: "no autonomous clinical
+decisions" currently depends on our script staying alive, not on a platform
+guarantee. A proper fix is either a Hermes feature request, or not
+connecting client-facing channels to an agent profile at all.
+
 Payload shapes vary by platform, so extraction is defensive and the raw
 payload is recorded for the first runs while we learn the real shape.
 """
@@ -86,14 +105,22 @@ def extract(payload: dict) -> tuple[str, str, str, str, tuple[str, ...]]:
     return message_id, sender, subject, body, attachments
 
 
+SKIP = {"action": "skip", "reason": "handled by TRT triage pipeline"}
+
+
 def main() -> int:
-    skip = {"action": "skip", "reason": "handled by TRT triage pipeline"}
+    # Emit the skip FIRST, before any work that could fail, crash or hang.
+    # fail_closed does not apply to this event (see module docstring), so a
+    # skip we have already written is the only thing that reliably stops the
+    # agent replying to a client. Everything after this is best-effort.
+    print(json.dumps(SKIP), flush=True)
+
+    skip = SKIP
 
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except Exception as err:  # noqa: BLE001
         note(f"could not parse hook payload: {err}")
-        print(json.dumps(skip))
         return 0
 
     # Keep the raw shape while we are still learning it. Remove once the
@@ -105,7 +132,6 @@ def main() -> int:
 
         if not body.strip():
             note(f"{message_id}: empty body, nothing to triage")
-            print(json.dumps(skip))
             return 0
 
         from hermes_trt.models import InboundMessage
@@ -142,7 +168,6 @@ def main() -> int:
             "payload": payload,
         })
 
-    print(json.dumps(skip))
     return 0
 
 
