@@ -31,7 +31,11 @@
     back: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
     repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
-    flask: '<path d="M9 3h6M10 3v6L5 19a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 19l-5-10V3"/><path d="M7.5 14h9"/>'
+    flask: '<path d="M9 3h6M10 3v6L5 19a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 19l-5-10V3"/><path d="M7.5 14h9"/>',
+    circle: '<circle cx="12" cy="12" r="9"/>',
+    half: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>',
+    pause: '<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>',
+    flag: '<path d="M4 22V4M4 4h13l-2 4 2 4H4"/>'
   };
   function svg(d, cls) {
     return '<svg class="' + (cls || "") + '" viewBox="0 0 24 24" fill="none" ' +
@@ -54,6 +58,20 @@
     held:      { label: "Needs a person", colour: "#f4736f", tag: "urgent" }
   };
 
+  var STAGES = {
+    todo:     { label: "To do",             icon: "circle" },
+    progress: { label: "In progress",       icon: "half" },
+    waiting:  { label: "Waiting on client", icon: "pause" },
+    done:     { label: "Done",              icon: "check" }
+  };
+  var STAGE_ORDER = ["todo", "progress", "waiting", "done"];
+
+  function stageOf(m) { return m.stage || "todo"; }
+  function stageTag(m) {
+    var k = stageOf(m), s = STAGES[k];
+    return '<span class="stg s-' + k + '">' + svg(I[s.icon]) + esc(s.label) + "</span>";
+  }
+
   function initials(name) {
     return name.split(/\s+/).slice(0, 2).map(function (w) { return w[0]; })
       .join("").toUpperCase();
@@ -73,7 +91,7 @@
   var DATA = [
     msg({
       channel: "email", from: "Michael Reed", addr: "m.reed@example.com",
-      subject: "Blood test results attached", time: "09:14", unread: true,
+      stage: "progress", subject: "Blood test results attached", time: "09:14", unread: true,
       route: "physician", urgent: false, due: "Review within 2 working days",
       why: "Pathology results submitted for assessment. Required markers present.",
       client: { name: "Michael Reed", member: "Yearly · $860", since: "1 Jul 2026",
@@ -83,7 +101,7 @@
     }),
     msg({
       channel: "email", from: "Rachel Santos", addr: "r.santos@example.com",
-      subject: "Chest tightness since starting", time: "08:02", unread: true,
+      stage: "todo", subject: "Chest tightness since starting", time: "08:02", unread: true,
       route: "held", urgent: true, due: "Immediate",
       why: "Client describes a physical symptom and asks whether to stop treatment. Not routed automatically and no reply drafted — a qualified person must handle this.",
       client: { name: "Rachel Santos", member: "Quarterly · $240", since: "8 Aug 2026",
@@ -92,14 +110,14 @@
     }),
     msg({
       channel: "slack", from: "Dr Elena Chen", addr: "#clinical", time: "08:47",
-      subject: "Chasing Reed's follow-up bloods", unread: true,
+      stage: "todo", subject: "Chasing Reed's follow-up bloods", unread: true,
       route: "support", urgent: false, due: "Action within 3 working days",
       why: "Staff request for administrative follow-up.",
       body: "Can someone chase Michael Reed's 8-week follow-up bloods? He's due late this month and I'd rather not have it slip."
     }),
     msg({
       channel: "email", from: "Amara Brennan", addr: "a.brennan@example.com",
-      subject: "GP results — is this enough?", time: "08:51", unread: false,
+      stage: "progress", subject: "GP results — is this enough?", time: "08:51", unread: false,
       route: "support", urgent: false, due: "Action within 3 working days",
       why: "Checking which required markers are present is administrative. Clinical sufficiency is for the practitioner.",
       client: { name: "Amara Brennan", member: "Not yet a member", since: "—",
@@ -110,7 +128,7 @@
     }),
     msg({
       channel: "email", from: "Priya Sharma", addr: "p.sharma@example.com",
-      subject: "Re: Your monthly check-in", time: "Yesterday", unread: false,
+      stage: "waiting", subject: "Re: Your monthly check-in", time: "Yesterday", unread: false,
       route: "nursing", urgent: true, due: "Overdue by 2 days",
       why: "Reply to the monthly check-in. Client reports a change to their routine.",
       client: { name: "Priya Sharma", member: "Six months · $480", since: "3 Mar 2026",
@@ -119,7 +137,7 @@
     }),
     msg({
       channel: "email", from: "Daniel Whitcombe", addr: "d.whitcombe@example.com",
-      subject: "Changing my billing to yearly", time: "Yesterday", unread: false,
+      stage: "waiting", subject: "Changing my billing to yearly", time: "Yesterday", unread: false,
       route: "support", urgent: false, due: "Action within 3 working days",
       why: "Membership enquiry. Testing inclusions must be confirmed by client care, so no figure was quoted.",
       client: { name: "Daniel Whitcombe", member: "Quarterly · $240", since: "14 Jan 2026",
@@ -128,14 +146,14 @@
     }),
     msg({
       channel: "slack", from: "Sam Okonkwo", addr: "#general", time: "Yesterday",
-      subject: "New starter needs system access", unread: false,
+      stage: "todo", subject: "New starter needs system access", unread: false,
       route: "support", urgent: false, due: "Action within 3 working days",
       why: "Internal administrative request.",
       body: "New nurse starts Monday — can we get her set up with access before then?"
     }),
     msg({
       channel: "email", from: "Tom Nguyen", addr: "t.nguyen@example.com",
-      subject: "Travelling to Perth for six weeks", time: "Mon", unread: false,
+      stage: "progress", subject: "Travelling to Perth for six weeks", time: "Mon", unread: false,
       route: "support", urgent: false, due: "Action within 3 working days",
       why: "Logistics enquiry about testing and delivery.",
       client: { name: "Tom Nguyen", member: "Yearly · $860", since: "2 Feb 2026",
@@ -183,7 +201,8 @@
       test: function () { return true; } }
   ];
 
-  var state = { queue: "inbox", selected: null, unreadOnly: false, urgentOnly: false, q: "" };
+  var state = { queue: "inbox", selected: null, unreadOnly: false,
+                urgentOnly: false, stage: null, q: "" };
 
   function source(qid) {
     var q = QUEUES.filter(function (x) { return x.id === qid; })[0];
@@ -198,6 +217,7 @@
   }
   function visible() {
     var rows = inQueue(state.queue);
+    if (state.stage) rows = rows.filter(function (m) { return stageOf(m) === state.stage; });
     if (state.unreadOnly) rows = rows.filter(function (m) { return m.unread; });
     if (state.urgentOnly) rows = rows.filter(function (m) { return m.urgent; });
     if (state.q) {
@@ -258,6 +278,7 @@
         '<div class="it-subj">' + esc(m.subject) + "</div>" +
         '<div class="it-prev">' + esc(m.body.replace(/\n+/g, " ").slice(0, 110)) + "</div>" +
         '<div class="it-meta">' +
+          (m.filtered ? "" : stageTag(m)) +
           (m.channel === "slack" ? tag(m.addr, "mute") : "") +
           (t ? tag(t.label, t.tag) : "") +
           (m.urgent ? tag("Urgent", "urgent") : "") +
@@ -289,6 +310,7 @@
           svg(I.back) + "Back</button>" +
         "<h1>" + esc(m.subject) + "</h1>" +
         '<div class="pane-meta">' +
+          (m.filtered ? "" : stageTag(m)) +
           (m.channel === "slack" ? tag("Internal chat " + m.addr, "mute")
                                  : tag("Client email", "mute")) +
           (t ? tag(t.label, t.tag) : "") +
@@ -301,6 +323,8 @@
         '<button class="btn primary" id="a-reply">' + svg(I.reply) + "Reply</button>" +
         '<span class="menu"><button class="btn" id="a-assign">' + svg(I.user) +
           "Assign</button></span>" +
+        '<span class="menu"><button class="btn" id="a-stage">' + svg(I.flag) +
+          esc(STAGES[stageOf(m)].label) + "</button></span>" +
         '<button class="btn" id="a-snooze">' + svg(I.clock) + "Snooze</button>" +
         '<span class="spacer"></span>' +
         '<button class="btn" id="a-done"' + (closed ? " disabled" : "") + ">" +
@@ -339,7 +363,15 @@
           '<div class="kv" style="margin-top:9px"><span class="k">Queue</span>' +
           '<span class="v">' + esc(t.label) + "</span></div>" +
           (m.due ? '<div class="kv"><span class="k">Target</span><span class="v">' +
-            esc(m.due) + "</span></div>" : "") + "</div>"
+            esc(m.due) + "</span></div>" : "") +
+          '<div class="kv"><span class="k">Stage</span><span class="v">' +
+            esc(STAGES[stageOf(m)].label) + "</span></div>" +
+          '<div class="stage-rail" role="img" aria-label="Stage ' +
+            esc(STAGES[stageOf(m)].label) + '">' +
+            STAGE_ORDER.map(function (k, i) {
+              var at = STAGE_ORDER.indexOf(stageOf(m));
+              return '<span class="sbar' + (i <= at ? (stageOf(m) === "done" ? " done" : " on") : "") + '"></span>';
+            }).join("") + "</div>" + "</div>"
           : '<div class="side-card"><h3>Routing</h3><div class="routed">' +
             esc(m.why) + "</div></div>") +
 
@@ -366,6 +398,7 @@
     var back = $("back"); if (back) back.onclick = function () { pane.classList.remove("open"); };
     $("a-reply").onclick = openComposer;
     $("a-assign").onclick = openAssign;
+    $("a-stage").onclick = openStage;
     $("a-snooze").onclick = function () { toast(I.clock, "Snoozed until tomorrow morning."); };
     if (!closed) $("a-done").onclick = markDone;
   }
@@ -580,6 +613,35 @@
       toast(I.user, to ? "Moved to " + TEAM[to].label + "." : "Unassigned.");
     });
   }
+  function openStage() {
+    var host = $("a-stage").parentNode;
+    if (host.querySelector(".menu-pop")) { closeMenus(); return; }
+    closeMenus();
+    var now = current();
+    var pop = document.createElement("div");
+    pop.className = "menu-pop";
+    pop.innerHTML = '<div class="menu-cap">Stage</div>' +
+      STAGE_ORDER.map(function (k) {
+        var isCurrent = stageOf(now) === k;
+        return '<button data-stage="' + k + '"' + (isCurrent ? ' aria-current="true"' : "") + ">" +
+          '<span class="stg s-' + k + '" style="border:0;padding:0">' +
+          svg(I[STAGES[k].icon]) + "</span>" + esc(STAGES[k].label) +
+          (isCurrent ? '<span class="tick">' + svg(I.check) + "</span>" : "") + "</button>";
+      }).join("");
+    host.appendChild(pop);
+    pop.addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-stage]");
+      if (!b) return;
+      var to = b.getAttribute("data-stage");
+      closeMenus();
+      if (stageOf(now) === to) return;
+      if (to === "done") { markDone(); return; }
+      now.stage = to;
+      render();
+      toast(I.flag, "Moved to " + STAGES[to].label + ".");
+    });
+  }
+
   function closeMenus() {
     var pops = document.querySelectorAll(".menu-pop");
     for (var i = 0; i < pops.length; i++) pops[i].remove();
@@ -590,6 +652,7 @@
 
   function markDone() {
     var m = current();
+    m.stage = "done";
     var i = DATA.indexOf(m);
     if (i > -1) DATA.splice(i, 1);
     var j = FILTERED.indexOf(m);
@@ -628,6 +691,18 @@
     if (m) m.unread = false;
     render();
   });
+
+  function stageChip(id, key) {
+    $(id).onclick = function () {
+      // Mutually exclusive: two stage filters at once would always be empty.
+      state.stage = state.stage === key ? null : key;
+      $("f-todo").setAttribute("aria-pressed", state.stage === "todo");
+      $("f-progress").setAttribute("aria-pressed", state.stage === "progress");
+      renderList();
+    };
+  }
+  stageChip("f-todo", "todo");
+  stageChip("f-progress", "progress");
 
   $("f-unread").onclick = function () {
     state.unreadOnly = !state.unreadOnly;
