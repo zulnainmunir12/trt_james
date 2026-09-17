@@ -351,7 +351,7 @@
   }
 
   function tableHTML(rows) {
-    return '<div class="card"><table><thead><tr>' +
+    return '<div class="card"><div class="table-scroll"><table><thead><tr>' +
       '<th class="sortable" data-sort="key">Key' + sortArrow("key") + "</th>" +
       "<th>Summary</th>" +
       "<th>Queue</th>" +
@@ -371,7 +371,7 @@
           "<td>" + statusEl(t.st) + "</td>" +
           "<td>" + priorityEl(t.pri) + "</td>" +
           "<td>" + dueEl(t.due) + "</td></tr>";
-      }).join("") + "</tbody></table></div>";
+      }).join("") + "</tbody></table></div></div>";
   }
 
   function boardHTML(rows) {
@@ -687,14 +687,14 @@
     $("main").innerHTML = '<div class="wrap">' +
       '<div class="page-head"><div><h1>Clients</h1>' +
       "<p>Everyone with activity in the system, soonest obligation first.</p></div></div>" +
-      '<div class="card"><table><thead><tr><th>Client</th><th>Contact</th>' +
+      '<div class="card"><div class="table-scroll"><table><thead><tr><th>Client</th><th>Contact</th>' +
       "<th>Open tickets</th><th>Next obligation</th></tr></thead><tbody>" +
       rows.map(function (c) {
         return "<tr><td><span class='who-cell'>" + avatar(c.name, "md") +
           "<span><div style='font-weight:600'>" + esc(c.name) + "</div></span></span></td>" +
           '<td style="color:var(--dim)">' + esc(c.email || "—") + "</td>" +
           "<td>" + c.open + "</td><td>" + dueEl(c.next) + "</td></tr>";
-      }).join("") + "</tbody></table></div></div>";
+      }).join("") + "</tbody></table></div></div></div>";
   }
 
   /* ------------------------------------------------------------ boot */

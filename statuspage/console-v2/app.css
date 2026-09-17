@@ -531,3 +531,88 @@ tbody tr:last-child td { border-bottom: none; }
   .wrap { padding: 18px 16px 40px; }
   .page-head h1 { font-size: 25px; }
 }
+
+/* ===================================================================
+   CONTRAST SYSTEM — three tones
+   ===================================================================
+   Everything was one tone (white on white), which is why it read flat.
+   Three surfaces now, layered as primitive → semantic → component so the
+   scheme can be changed in one place:
+
+     navigation   deep navy    — the anchor, and it frames the content
+     chrome       white        — topbar, cards, tables
+     ground       tinted wash  — the page behind the cards
+
+   Text on navy is checked: #eef4fb on #0b1725 is 14.6:1, and the dimmed
+   variant #93a9c0 is 6.1:1, both well clear of 4.5:1.
+*/
+
+:root {
+  /* primitive */
+  --navy-900: #0b1725;
+  --navy-800: #0f2032;
+  --navy-700: #16304a;
+  --navy-600: #1d3f5f;
+
+  /* semantic — navigation surface */
+  --nav-bg:        var(--navy-900);
+  --nav-bg-2:      var(--navy-800);
+  --nav-ink:       #eef4fb;
+  --nav-ink-dim:   #93a9c0;
+  --nav-ink-faint: #6b8299;
+  --nav-line:      rgba(255,255,255,.08);
+  --nav-active-bg: rgba(86,179,232,.16);
+}
+
+/* ---- navigation surface ---- */
+
+.brand { background: var(--nav-bg); border-right-color: var(--nav-line);
+         border-bottom-color: var(--nav-line); }
+.brand .nm { color: var(--nav-ink); border-left-color: var(--nav-line);
+             white-space: nowrap; font-size: 12.5px; }
+/* The wordmark is built for dark backgrounds — on navy the full lockup
+   shows, so it no longer needs cropping. */
+.brand img { aspect-ratio: auto; height: 30px; object-fit: contain; }
+
+.side { background: var(--nav-bg); border-right-color: var(--nav-line); }
+.side-label { color: var(--nav-ink-faint); }
+.nav { color: var(--nav-ink-dim); }
+.nav svg { color: var(--nav-ink-faint); }
+.nav:hover { background: var(--nav-bg-2); color: var(--nav-ink); }
+.nav:hover svg { color: var(--cyan); }
+.nav[aria-current="true"] { background: var(--nav-active-bg); color: #fff; }
+.nav[aria-current="true"] svg { color: var(--cyan); }
+.nav .n { background: rgba(255,255,255,.09); color: var(--nav-ink-dim); }
+.nav[aria-current="true"] .n { background: rgba(255,255,255,.16); color: #fff; }
+.nav .n.alert { background: rgba(248,113,113,.2); color: #ffb4b4; }
+
+/* ---- overflow ----
+   The real cause of the clipped sidebar labels: a grid child defaults to
+   min-width:auto, so the wide ticket table refused to shrink and pushed the
+   whole grid past the viewport. The page then scrolled sideways and cut the
+   first character off the sidebar. */
+.shell { overflow: hidden; }
+.main { min-width: 0; }
+.wrap { min-width: 0; }
+.card { max-width: 100%; }
+.table-scroll { overflow-x: auto; }
+
+/* ---- topbar sits on white, against the navy ---- */
+.topbar { background: var(--surface); }
+.search { background: var(--bg); }
+
+@media (max-width: 1024px) {
+  .side { box-shadow: 0 30px 60px -20px rgba(11,23,37,.6); }
+}
+
+/* ---- topbar proportions ----
+   It was 56px with a 36px search inside it, which left almost no breathing
+   room and made the bar feel cramped rather than compact. */
+:root { --topbar: 60px; }
+.topbar { gap: 14px; padding: 0 22px; }
+.brand { padding: 0 16px; gap: 10px; }
+.who { gap: 10px; }
+.who .av-sm { width: 28px; height: 28px; }
+
+/* Page heading sits closer to the chrome so the content starts higher. */
+.wrap { padding: 22px 28px 52px; }
