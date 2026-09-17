@@ -616,3 +616,86 @@ tbody tr:last-child td { border-bottom: none; }
 
 /* Page heading sits closer to the chrome so the content starts higher. */
 .wrap { padding: 22px 28px 52px; }
+
+/* ===================================================================
+   MOBILE
+   ===================================================================
+   A client may well open this on a phone, so it has to hold up at 375px
+   rather than merely not break.
+*/
+
+/* The brand was hidden entirely below 1024px, which left a client opening
+   this on a phone with no logo anywhere. It moves into the topbar instead. */
+@media (max-width: 1024px) {
+  .brand { display: flex; background: none; border: 0; padding: 0;
+           grid-area: unset; }
+  .brand img { height: 22px; }
+  .brand .nm { display: none; }
+  .topbar { gap: 11px; padding: 0 14px; }
+  .shell { grid-template-areas: "topbar" "main"; }
+  .topbar .brand { order: 2; }
+  .topbar .search { order: 3; }
+  .icon-btn { order: 1; }
+}
+
+@media (max-width: 760px) {
+  /* A seven-column table cannot work at this width. Each row becomes a
+     card, with the column name carried through as a label so no value
+     loses its meaning. */
+  .table-scroll { overflow-x: visible; }
+  table, thead, tbody, tr, td { display: block; width: 100%; }
+  thead { display: none; }
+  tbody tr {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 16px; padding: 14px 16px; margin: 0 0 10px;
+    box-shadow: var(--shadow);
+  }
+  tbody tr:last-child { margin-bottom: 0; }
+  tbody td { border: 0; padding: 0; display: flex; align-items: center;
+             justify-content: space-between; gap: 14px; min-height: 30px; }
+  tbody td::before {
+    content: attr(data-l);
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--dimmer); flex: none;
+  }
+  /* Key and summary lead the card, so they drop their label and sit full width. */
+  tbody td.key, tbody td.cell-sum { display: block; }
+  tbody td.key::before, tbody td.cell-sum::before { display: none; }
+  tbody td.key { font-size: 11px; margin-bottom: 3px; }
+  tbody td.cell-sum { margin-bottom: 11px; padding-bottom: 11px;
+                      border-bottom: 1px solid var(--line); }
+  tbody td.cell-sum .sum { font-size: 14.5px; line-height: 1.4; }
+  .card { background: none; border: 0; box-shadow: none; border-radius: 0; }
+
+  /* Filters scroll sideways rather than stacking into a tall block. */
+  .filterbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+               border-radius: 14px; padding: 10px 12px; }
+  .filterbar::-webkit-scrollbar { display: none; }
+  .filterbar .spacer, .filterbar .count { display: none; }
+  .sel > button { white-space: nowrap; }
+
+  .stats { grid-template-columns: 1fr 1fr; gap: 10px; margin-top: -28px; }
+  .stat { padding: 15px 16px; }
+  .stat .n { font-size: 33px; }
+  .hero { padding: 24px 20px 46px; border-radius: 20px; }
+  .hero h1 { font-size: 26px; }
+  .grid2 { gap: 10px; }
+  .who span { display: none; }
+  .search { max-width: none; }
+  .kbd { display: none; }
+
+  .det-side { position: static; }
+  .detail { gap: 14px; }
+  .det-main .card { padding: 18px 16px; }
+  .det-head h1 { font-size: 19px; }
+  .msg { padding: 14px 15px; }
+  .ev { grid-template-columns: 62px 1fr; }
+  .ev .av { display: none; }
+  .ev > span:last-child { grid-column: 2; }
+}
+
+@media (max-width: 400px) {
+  .wrap { padding: 16px 12px 36px; }
+  .stats { grid-template-columns: 1fr; }
+  .page-head h1 { font-size: 23px; }
+}

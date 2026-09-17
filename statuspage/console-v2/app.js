@@ -362,15 +362,15 @@
       "</tr></thead><tbody>" +
       rows.map(function (t) {
         return '<tr data-key="' + t.key + '">' +
-          '<td class="key">' + esc(t.key) + "</td>" +
-          '<td><div class="sum">' + esc(t.sum) + "</div>" +
+          '<td class="key" data-l="Key">' + esc(t.key) + "</td>" +
+          '<td class="cell-sum" data-l="Summary"><div class="sum">' + esc(t.sum) + "</div>" +
             '<div class="sub">' + esc(TYPE[t.type]) + " · " + esc(t.age) + " old</div></td>" +
-          "<td>" + tag(QUEUE[t.q].label, QUEUE[t.q].cls) + "</td>" +
-          '<td>' + (t.client === "—" ? '<span style="color:var(--dimmer)">—</span>'
+          '<td data-l="Queue">' + tag(QUEUE[t.q].label, QUEUE[t.q].cls) + "</td>" +
+          '<td data-l="Client">' + (t.client === "—" ? '<span style="color:var(--dimmer)">—</span>'
                     : '<span class="who-cell">' + avatar(t.client) + esc(t.client) + "</span>") + "</td>" +
-          "<td>" + statusEl(t.st) + "</td>" +
-          "<td>" + priorityEl(t.pri) + "</td>" +
-          "<td>" + dueEl(t.due) + "</td></tr>";
+          '<td data-l="Status">' + statusEl(t.st) + "</td>" +
+          '<td data-l="Priority">' + priorityEl(t.pri) + "</td>" +
+          '<td data-l="Target">' + dueEl(t.due) + "</td></tr>";
       }).join("") + "</tbody></table></div></div>";
   }
 
