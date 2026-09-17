@@ -58,7 +58,12 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
-  background: var(--bg); color: var(--ink);
+  background:
+    radial-gradient(940px 460px at 14% -6%, rgba(86,179,232,.13), transparent 62%),
+    radial-gradient(820px 420px at 94% 2%,  rgba(143,217,255,.11), transparent 64%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--ink);
   font-family: var(--body); font-size: 14px; line-height: 1.55;
   -webkit-font-smoothing: antialiased; overflow: hidden;
 }
@@ -131,7 +136,7 @@ button { cursor: pointer; background: none; border: 0; }
 /* ---- sidebar ---- */
 
 .side { grid-area: side; background: var(--surface); border-right: 1px solid var(--line);
-        overflow-y: auto; padding: 14px 11px; }
+        overflow-y: auto; overflow-x: hidden; padding: 14px 11px; }
 .side-label { font-family: var(--mono); font-size: 10px; letter-spacing: .24em;
               text-transform: uppercase; font-weight: 600; color: var(--dimmer);
               padding: 16px 11px 7px; }
@@ -149,8 +154,8 @@ button { cursor: pointer; background: none; border: 0; }
 .nav[aria-current="true"] svg { color: var(--deep); }
 /* Active marker grows out from the centre rather than blinking on. */
 .nav[aria-current="true"]::before {
-  content: ""; position: absolute; left: -11px; top: 50%; transform: translateY(-50%);
-  width: 3px; height: 62%; border-radius: 0 3px 3px 0; background: var(--grad);
+  content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 58%; border-radius: 0 3px 3px 0; background: var(--grad);
   animation: markIn .28s cubic-bezier(.2,.8,.3,1);
 }
 @keyframes markIn { from { height: 0; opacity: 0; } }
@@ -160,7 +165,10 @@ button { cursor: pointer; background: none; border: 0; }
 .nav[aria-current="true"] .n { background: var(--surface); color: var(--deep-tx); }
 .nav .n.alert { background: var(--held-bg); color: var(--held); }
 
-.main { grid-area: main; overflow-y: auto; }
+.main { grid-area: main; overflow-y: auto; position: relative; }
+/* Hairline of the brand gradient where the content meets the chrome. */
+.main::before { content: ""; position: sticky; top: 0; display: block; height: 2px;
+                background: var(--grad); opacity: .5; z-index: 5; }
 
 /* ---- motion ----
    Deceleration on arrival, 300ms, per the motion guidance. Everything here
@@ -351,8 +359,8 @@ tbody tr:last-child td { border-bottom: none; }
 .act-t { font-size: 13px; }
 .act-d { font-size: 11.5px; color: var(--dimmer); margin-top: 2px; }
 
-.side .card { padding: 18px; margin-bottom: 12px; }
-.side h3 { margin-bottom: 13px; }
+.det-side .card { padding: 18px; margin-bottom: 12px; }
+.det-side h3 { margin-bottom: 13px; }
 .field { display: flex; justify-content: space-between; align-items: center; gap: 12px;
          padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12.8px; }
 .field:last-child { border-bottom: none; }
@@ -493,4 +501,33 @@ tbody tr:last-child td { border-bottom: none; }
   .scrim { position: fixed; inset: 0; background: rgba(12,26,43,.34); z-index: 55;
            opacity: 0; pointer-events: none; transition: opacity .26s; }
   .scrim.on { opacity: 1; pointer-events: auto; }
+}
+
+/* --------------------------------------------- alignment corrections */
+
+/* The page heading, its blurb, the filter bar and the table all have to
+   share one left edge. They were on different paddings, so the heading
+   appeared to hang outside the cards below it. */
+.wrap { max-width: 1320px; margin: 0 auto; padding: 26px 28px 52px; }
+.page-head { margin-bottom: 20px; }
+.page-head h1 { line-height: 1.16; }
+.page-head p { margin-top: 6px; }
+
+/* Detail page: two columns that both start at the top, with the fields
+   panel sticky so it stays beside a long conversation instead of ending
+   up marooned at the bottom. */
+.detail { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 20px;
+          align-items: start; }
+.det-main { min-width: 0; }
+.det-side { position: sticky; top: 16px; }
+.det-side .card { background: var(--surface); border: 1px solid var(--line);
+                  border-radius: var(--r-card); box-shadow: var(--shadow-2); }
+
+@media (max-width: 1180px) {
+  .detail { grid-template-columns: minmax(0,1fr); }
+  .det-side { position: static; }
+}
+@media (max-width: 720px) {
+  .wrap { padding: 18px 16px 40px; }
+  .page-head h1 { font-size: 25px; }
 }

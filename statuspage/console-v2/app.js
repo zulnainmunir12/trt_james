@@ -488,7 +488,7 @@
             '<div class="act-d">' + esc(a[1]) + "</div></span></div>";
         }).join("") + "</div>" +
 
-      "</div></div><aside class='side'>" +
+      "</div></div><aside class='det-side'>" +
         '<div class="card"><h3 class="eyebrow">Details</h3>' +
           '<div class="field"><span class="k">Status</span><span class="v">' + statusEl(t.st) + "</span></div>" +
           '<div class="field"><span class="k">Queue</span><span class="v">' + tag(QUEUE[t.q].label, QUEUE[t.q].cls) + "</span></div>" +
