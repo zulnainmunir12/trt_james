@@ -232,11 +232,18 @@
 
   var TABS = [
     { id: "overview", label: "Overview", icon: I.grid },
-    { id: "tickets",  label: "Tickets",  icon: I.ticket, count: function () { return open().length; } },
+    { id: "tickets",  label: "All tickets", icon: I.ticket,
+      count: function () { return open().length; } },
+    { id: "held",     label: "Held for review", icon: I.alert, alert: true,
+      count: function () { return open().filter(function (t) { return t.q === "held"; }).length; } },
+    { sep: "Channels" },
     { id: "email",    label: "Client email", icon: I.mail,
       count: function () { return open().filter(function (t) { return t.ch === "email"; }).length; } },
     { id: "slack",    label: "Internal messages", icon: I.hash,
       count: function () { return open().filter(function (t) { return t.ch === "slack"; }).length; } },
+    { id: "system",   label: "Scheduled checks", icon: I.repeat,
+      count: function () { return open().filter(function (t) { return t.ch === "system"; }).length; } },
+    { sep: "Records" },
     { id: "schedule", label: "Schedule", icon: I.cal },
     { id: "clients",  label: "Clients",  icon: I.users }
   ];
@@ -247,10 +254,12 @@
 
   function renderTabs() {
     $("tabs").innerHTML = TABS.map(function (t) {
+      if (t.sep) return '<div class="side-label">' + esc(t.sep) + "</div>";
       var n = t.count ? t.count() : null;
-      return '<button class="tab" data-tab="' + t.id + '" aria-current="' +
-        (state.tab === t.id) + '">' + svg(t.icon) + esc(t.label) +
-        (n ? '<span class="n">' + n + "</span>" : "") + "</button>";
+      return '<button class="nav" data-tab="' + t.id + '" aria-current="' +
+        (state.tab === t.id) + '">' + svg(t.icon) + "<span>" + esc(t.label) + "</span>" +
+        (n ? '<span class="n' + (t.alert ? " alert" : "") + '">' + n + "</span>" : "") +
+        "</button>";
     }).join("");
   }
   $("tabs").addEventListener("click", function (e) {
@@ -690,6 +699,33 @@
 
   /* ------------------------------------------------------------ boot */
 
+  // 30ms per item, inside the 20-40ms window the motion guidance gives, so a
+  // fifteen-row table finishes revealing in well under half a second.
+  function stagger() {
+    var items = document.querySelectorAll(
+      "tbody tr, .ticket, .row, .stat, .col, .routine");
+    for (var i = 0; i < items.length; i++) {
+      items[i].style.animationDelay = Math.min(i * 30, 420) + "ms";
+    }
+  }
+
+  // Figures count up on the overview. Short enough not to delay reading, and
+  // it draws the eye to the number rather than the card.
+  function countUp() {
+    document.querySelectorAll(".stat .n").forEach(function (el) {
+      var target = parseInt(el.textContent, 10);
+      if (isNaN(target) || target === 0) return;
+      var start = performance.now(), dur = 520;
+      function frame(now) {
+        var p = Math.min((now - start) / dur, 1);
+        // ease-out: fast then settling, matching the arrival easing elsewhere
+        el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
   function render() {
     renderTabs();
     closePops();
@@ -697,15 +733,52 @@
     if (state.tab === "overview") return renderOverview();
     if (state.tab === "schedule") return renderSchedule();
     if (state.tab === "clients")  return renderClients();
+    if (state.tab === "held")
+      return renderTickets(T.filter(function (t) { return t.q === "held"; }),
+        "Held for review",
+        "Withheld from automatic routing because they need a qualified person's judgement. " +
+        "Nothing here has been answered or assigned.");
+    if (state.tab === "system")
+      return renderTickets(T.filter(function (t) { return t.ch === "system"; }),
+        "Scheduled checks",
+        "Raised by the automated routines rather than by a person - follow-ups falling " +
+        "due, results expiring, renewals approaching.");
     if (state.tab === "email")
       return renderTickets(T.filter(function (t) { return t.ch === "email"; }),
         "Client email", "Tickets raised from messages clients sent in.");
     if (state.tab === "slack")
       return renderTickets(T.filter(function (t) { return t.ch === "slack"; }),
         "Internal messages", "Tickets raised from requests your team posted in chat.");
-    renderTickets(null, "Tickets",
+    renderTickets(null, "All tickets",
       "Every piece of work in the system, whichever channel it arrived from.");
   }
+
+  // Wrap render so motion applies to whatever view was just drawn.
+  var baseRender = render;
+  render = function () {
+    baseRender();
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      stagger();
+      if (state.tab === "overview" && !state.ticket) countUp();
+    }
+  };
+
+  // Off-canvas sidebar below 1024px.
+  var menu = $("menu"), scrim = $("scrim"), side = $("tabs");
+  function closeSide() { side.classList.remove("open"); scrim.classList.remove("on"); }
+  if (menu) menu.onclick = function () {
+    side.classList.toggle("open");
+    scrim.classList.toggle("on", side.classList.contains("open"));
+  };
+  if (scrim) scrim.onclick = closeSide;
+  side.addEventListener("click", function (e) { if (e.target.closest("[data-tab]")) closeSide(); });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && document.activeElement !== $("search")) {
+      e.preventDefault(); $("search").focus();
+    }
+    if (e.key === "Escape") { closePops(); closeSide(); }
+  });
 
   $("search").addEventListener("input", function () {
     state.q = this.value.trim();
