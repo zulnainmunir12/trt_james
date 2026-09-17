@@ -1,0 +1,40 @@
+# Slack app manifest for the TRT Australia care-operations assistant.
+#
+# Paste this at https://api.slack.com/apps → Create New App → From a manifest.
+#
+# Scopes are deliberately minimal. We poll channel history on a schedule the
+# same way the mailbox is polled, so there is no Socket Mode, no app-level
+# token and no public endpoint — one bot token is all that is needed.
+#
+#   channels:history   read messages in public channels it is invited to
+#   channels:read      list channels so it knows where it has been invited
+#   users:read         turn a user ID into a person's name on the ticket
+#   chat:write         post escalations and confirmations back
+
+display_information:
+  name: Care Operations
+  description: Turns staff requests into tracked work and watches deadlines.
+  background_color: "#0c1a2b"
+  long_description: >-
+    Reads requests raised in your channels and turns them into tracked work
+    for the right part of the team, alongside client email. Watches target
+    dates and raises anything that slips. It never makes clinical decisions;
+    anything requiring medical judgement is held for a qualified person.
+
+features:
+  bot_user:
+    display_name: Care Ops
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - users:read
+      - chat:write
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
