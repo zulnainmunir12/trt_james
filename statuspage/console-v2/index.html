@@ -12,36 +12,215 @@
 </head>
 <body>
 
-<div class="shell">
+<div class="shell" id="shell">
 
   <div class="brand">
-    <img src="trt-logo.webp" alt="TRT Australia">
+    <img src="trt-logo.webp" alt="TRT Australia" class="logo-full">
+    <span class="logo-mark" aria-hidden="true">T</span>
     <span class="nm">Care Operations</span>
+    <button class="collapse" id="collapse" aria-label="Collapse sidebar" title="Collapse sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+    </button>
   </div>
 
   <header class="topbar">
-    <button class="icon-btn" id="menu" aria-label="Menu">
+    <button class="icon-btn" id="menu" aria-label="Open menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
     </button>
-    <label class="search">
+
+    <button class="cmd-trigger" id="cmdopen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="search" type="search" placeholder="Search tickets and clients" aria-label="Search">
-      <span class="kbd">/</span>
-    </label>
+      <span>Search or jump to…</span>
+      <span class="kbd">Ctrl K</span>
+    </button>
+
+    <span class="srcbadge demo" id="srcbadge">Sample data</span>
     <span class="spacer"></span>
-    <span class="who">
-      <span class="av av-sm" style="background:#1a6ba5" aria-hidden="true">AK</span>
-      <span>Alex Kaur · Client care</span>
-    </span>
+
+    <div class="menu-wrap">
+      <button class="icon-btn bell" id="bell" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="bdot" id="belldot" hidden></span>
+      </button>
+      <div class="pop pop-notif" id="notifpop" hidden></div>
+    </div>
+
+    <div class="menu-wrap">
+      <button class="whobtn" id="whobtn">
+        <span class="av av-sm" id="whoav" aria-hidden="true">AK</span>
+        <span class="whotxt"><span class="wn" id="whoname">Alex Kaur</span>
+          <span class="wr" id="whorole">Client care</span></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" aria-hidden="true" class="chev"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="pop pop-who" id="whopop" hidden></div>
+    </div>
   </header>
 
   <nav class="side" id="tabs" aria-label="Sections"></nav>
-
   <main class="main" id="main"></main>
 </div>
+
 <div class="scrim" id="scrim"></div>
+
+<button class="fab" id="askbtn" data-label="Ask" aria-label="Ask about your work">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/>
+    <path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/></svg>
+</button>
+
+<div class="ask-scrim" id="askscrim" hidden></div>
+<aside class="askpanel" id="askpanel" hidden aria-label="Ask about your work">
+  <div class="ask-head">
+    <span class="ask-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
+    </span>
+    <span><h2>Ask</h2><div class="sub">Answers read from this board</div></span>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="askclose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="ask-log" id="asklog"></div>
+  <div class="ask-foot">
+    <div class="ask-box">
+      <input id="askq" type="text" autocomplete="off" aria-label="Ask a question"
+             placeholder="Ask about tickets, queues or dates...">
+      <button class="ask-send" id="asksend" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <span class="ask-note">Reads the tickets on this board. It does not give
+      clinical advice, and it cannot change or send anything.</span>
+  </div>
+</aside>
+
+<div class="modal-overlay" id="newticket" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="New ticket">
+    <div class="modal-head">
+      <h2>New ticket</h2><span class="spacer"></span>
+      <button class="icon-btn" id="ntclose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="f" id="f-sum">
+        <label for="nt-sum">Summary</label>
+        <input id="nt-sum" type="text" placeholder="What needs doing?">
+        <div class="err">Give the ticket a summary so the queue knows what it is.</div>
+      </div>
+
+      <div class="clin-note" id="nt-clin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
+          <path d="M12 9v4M12 17h.01"/></svg>
+        <span class="t"><b>This reads as clinical.</b> A message like this arriving
+          by email would be held for a qualified person rather than routed.
+          Consider Physician or Held for review.</span>
+      </div>
+
+      <div class="f">
+        <label for="nt-body">Detail</label>
+        <textarea id="nt-body" placeholder="Anything the person picking this up needs to know."></textarea>
+      </div>
+
+      <div class="field-row">
+        <div class="f">
+          <label for="nt-client">Client</label>
+          <input id="nt-client" type="text" placeholder="Leave blank if not about one person">
+        </div>
+        <div class="f">
+          <label for="nt-type">Type</label>
+          <select id="nt-type">
+            <option value="admin">Administrative</option>
+            <option value="consult">Client consultation</option>
+            <option value="clinical">Clinical review</option>
+            <option value="pathology">Pathology follow-up</option>
+            <option value="escalation">Escalation</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="f">
+          <label for="nt-queue">Queue</label>
+          <select id="nt-queue">
+            <option value="support">Client care</option>
+            <option value="nursing">Nursing</option>
+            <option value="physician">Physician</option>
+            <option value="held">Held for review</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="nt-pri">Priority</label>
+          <select id="nt-pri">
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="f">
+        <label for="nt-due">Target</label>
+        <select id="nt-due">
+          <option value="">No target date</option>
+          <option value="0">Today</option>
+          <option value="1">Tomorrow</option>
+          <option value="3">In 3 days</option>
+          <option value="7">In a week</option>
+          <option value="14">In 2 weeks</option>
+          <option value="30">In a month</option>
+        </select>
+        <div class="sub">Anything past its target is escalated by the daily sweep.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="hint">Raised by you, not by a routine - the trail records that.</span>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="ntcancel">Cancel</button>
+      <button class="btn primary" id="ntcreate">Create ticket</button>
+    </div>
+  </div>
+</div>
+
+<div class="cmd-overlay" id="cmd" hidden>
+  <div class="cmd" role="dialog" aria-label="Command palette" aria-modal="true">
+    <div class="cmd-input">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="cmdq" type="text" autocomplete="off" aria-label="Search or command"
+             placeholder="Search tickets and clients, or type a command…">
+      <span class="kbd">esc</span>
+    </div>
+    <div class="cmd-results" id="cmdres"></div>
+  </div>
+</div>
+
+<div class="signin" id="signin" hidden>
+  <div class="signin-card">
+    <img src="trt-logo.webp" alt="TRT Australia" class="signin-logo">
+    <h1>Care Operations</h1>
+    <p>Sign in to continue.</p>
+    <button class="btn primary" id="signinbtn">Sign in</button>
+    <span class="signin-note">Demonstration environment</span>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>

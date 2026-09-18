@@ -1,0 +1,23 @@
+{
+  "display_information": {
+    "name": "Care Operations",
+    "description": "Turns staff requests into tracked work and watches deadlines.",
+    "background_color": "#0c1a2b"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Care Ops",
+      "always_online": true
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "channels:history",
+        "channels:read",
+        "users:read",
+        "chat:write"
+      ]
+    }
+  }
+}

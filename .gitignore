@@ -29,3 +29,10 @@ node_modules/
 Thumbs.db
 .vscode/
 .idea/
+
+# Build outputs. Regenerated from statuspage/console-v2 on every deploy, and
+# two copies in the tree is how a stale one got deployed by mistake once.
+demo-build-v2/
+demo-build-v2.zip
+statuspage/demo-build-v2/
+statuspage/demo-build-v2.zip

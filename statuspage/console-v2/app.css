@@ -627,15 +627,12 @@ tbody tr:last-child td { border-bottom: none; }
 /* The brand was hidden entirely below 1024px, which left a client opening
    this on a phone with no logo anywhere. It moves into the topbar instead. */
 @media (max-width: 1024px) {
-  .brand { display: flex; background: none; border: 0; padding: 0;
-           grid-area: unset; }
-  .brand img { height: 22px; }
-  .brand .nm { display: none; }
+  /* These rules used to move the brand into the topbar. The brand is now a
+     grid area and a sibling of .topbar, so `display: flex; grid-area: unset`
+     was un-hiding it and dropping it into auto placement at the bottom of
+     the page - the logo appeared under the content on every phone. The
+     .topbar .brand / .topbar .search selectors matched nothing at all. */
   .topbar { gap: 11px; padding: 0 14px; }
-  .shell { grid-template-areas: "topbar" "main"; }
-  .topbar .brand { order: 2; }
-  .topbar .search { order: 3; }
-  .icon-btn { order: 1; }
 }
 
 @media (max-width: 760px) {
@@ -667,11 +664,14 @@ tbody tr:last-child td { border-bottom: none; }
   tbody td.cell-sum .sum { font-size: 14.5px; line-height: 1.4; }
   .card { background: none; border: 0; box-shadow: none; border-radius: 0; }
 
-  /* Filters scroll sideways rather than stacking into a tall block. */
-  .filterbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
-               border-radius: 14px; padding: 10px 12px; }
-  .filterbar::-webkit-scrollbar { display: none; }
+  /* This used to scroll sideways with the scrollbar hidden. With only three
+     filters and the view toggle it bought nothing, and the toggle ended up
+     clipped mid-word at the right edge with no hint that the strip scrolled
+     - it read as broken, and the toggle was a primary control hidden inside
+     a scroller. Two wrapped rows show everything at once. */
+  .filterbar { flex-wrap: wrap; border-radius: 14px; padding: 10px 12px; }
   .filterbar .spacer, .filterbar .count { display: none; }
+  .filterbar .seg { margin-left: auto; }
   .sel > button { white-space: nowrap; }
 
   .stats { grid-template-columns: 1fr 1fr; gap: 10px; margin-top: -28px; }
@@ -699,3 +699,492 @@ tbody tr:last-child td { border-bottom: none; }
   .stats { grid-template-columns: 1fr; }
   .page-head h1 { font-size: 23px; }
 }
+
+/* ===================================================================
+   COLLAPSIBLE SIDEBAR
+   =================================================================== */
+
+:root { --side-collapsed: 64px; }
+
+.shell.collapsed { grid-template-columns: var(--side-collapsed) 1fr; }
+.shell.collapsed .brand { padding: 0; justify-content: center; }
+.shell.collapsed .logo-full,
+.shell.collapsed .brand .nm { display: none; }
+.shell.collapsed .logo-mark { display: grid; }
+.shell.collapsed .collapse { display: none; }
+/* Every target is the same 44px square, centred in the 64px rail, so the icons
+   sit on one axis and the hover pills do not change shape row to row. */
+/* The hover tooltip is positioned outside the rail, and `.side` scrolls, so
+   any overflow value other than visible clips it away completely — which it
+   did. The rail holds nine fixed items that fit any desktop height, so it has
+   nothing to scroll; if sections are ever added here, this needs revisiting. */
+.shell.collapsed .side { padding: 12px 0; overflow: visible; }
+.shell.collapsed .nav {
+  position: relative; width: 44px; height: 44px; margin: 0 auto 2px;
+  padding: 0; justify-content: center; border-radius: 13px;
+}
+.shell.collapsed .nav > span:not(.n) { display: none; }
+.shell.collapsed .nav svg { width: 20px; height: 20px; }
+/* Hover nudges the icon sideways when there is a label to move toward. There
+   is not one here, so it would just look like a wobble. */
+.shell.collapsed .nav:hover svg { transform: none; }
+
+/* Counts become a fixed 16px disc pinned to the icon, not a pill that grows
+   with the number — a variable-width badge left the right edge of the rail
+   ragged. The ring punches it out of the icon underneath. */
+.shell.collapsed .nav .n {
+  position: absolute; margin: 0; padding: 0; box-sizing: border-box;
+  width: 17px; height: 17px; min-width: 0;
+  display: grid; place-items: center; border-radius: 999px;
+  font-size: 9px; line-height: 1; letter-spacing: -.03em;
+  box-shadow: 0 0 0 2px var(--nav-bg);
+  /* Tucked into the button's corner, clipping only the corner of the 20px
+     icon. The disc is a fixed width whatever the number, which is what the
+     column actually needed — a pill that grew with the digits left the right
+     edge ragged. Any deeper and the ring cuts the icon in half. */
+  top: 2px; right: 2px;
+}
+/* The ring punches the badge out of whatever is behind it, so it has to track
+   the button's own background through hover and the active tint. The active
+   pill is translucent, so its value is pre-blended over the rail colour. */
+.shell.collapsed .nav:hover .n { box-shadow: 0 0 0 2px var(--nav-bg-2); }
+.shell.collapsed .nav[aria-current="true"] .n { box-shadow: 0 0 0 2px #173044; }
+
+/* Group headings have no room for their text, so they become a short centred
+   rule. A full-width border sat at a different inset to the icons and made
+   the column look bent. */
+.shell.collapsed .side-label {
+  font-size: 0; padding: 0; border-top: 0;
+  width: 24px; height: 1px; margin: 11px auto;
+  background: var(--nav-line);
+}
+
+/* The active marker is anchored to the rail edge rather than the button edge:
+   half the 20px of space either side of the 44px button. */
+.shell.collapsed .nav[aria-current="true"]::before { left: -10px; height: 44%; }
+
+.logo-mark {
+  display: none; width: 32px; height: 32px; border-radius: 11px;
+  background: var(--grad); place-items: center; color: #06243c;
+  font-family: var(--display); font-weight: 700; font-size: 15px; flex: none;
+}
+
+.collapse {
+  margin-left: auto; width: 28px; height: 28px; border-radius: 8px;
+  display: grid; place-items: center; color: var(--nav-ink-faint);
+  transition: background .16s, color .16s;
+}
+.collapse:hover { background: rgba(255,255,255,.08); color: var(--nav-ink); }
+.collapse svg { width: 16px; height: 16px; }
+
+/* A collapsed rail without labels is a memory test, so each icon carries
+   its name on hover. */
+.shell.collapsed .nav::after {
+  content: attr(data-label);
+  position: absolute; left: calc(100% + 10px); top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: var(--navy-800); color: var(--nav-ink);
+  font-family: var(--display); font-size: 12.5px; font-weight: 600;
+  padding: 6px 11px; border-radius: 8px; white-space: nowrap;
+  box-shadow: var(--shadow-3); opacity: 0; pointer-events: none;
+  transition: opacity .16s, transform .16s; z-index: 70;
+}
+.shell.collapsed .nav:hover::after { opacity: 1; transform: translateY(-50%); }
+
+/* ===================================================================
+   TOPBAR CONTROLS
+   =================================================================== */
+
+.cmd-trigger {
+  display: flex; align-items: center; gap: 10px; height: 36px;
+  padding: 0 13px; border-radius: 11px; background: var(--bg);
+  border: 1px solid var(--line); color: var(--dimmer); font-size: 13.2px;
+  width: 300px; max-width: 40vw; transition: border-color .18s, background .18s;
+}
+.cmd-trigger:hover { border-color: var(--blue); background: var(--surface); }
+.cmd-trigger svg { width: 15px; height: 15px; flex: none; }
+.cmd-trigger span:not(.kbd) { flex: 1; text-align: left; }
+
+.menu-wrap { position: relative; }
+.icon-btn.bell { display: inline-flex; position: relative; }
+.bdot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px;
+        border-radius: 50%; background: var(--held);
+        box-shadow: 0 0 0 2px var(--surface); }
+
+.whobtn { display: flex; align-items: center; gap: 9px; padding: 5px 9px 5px 5px;
+          border-radius: 999px; transition: background .16s; }
+.whobtn:hover { background: var(--hover); }
+.whotxt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+.wn { font-family: var(--display); font-size: 12.8px; font-weight: 600; color: var(--ink); }
+.wr { font-size: 10.5px; color: var(--dim); }
+.whobtn .chev { width: 14px; height: 14px; color: var(--dimmer); }
+
+.pop-notif, .pop-who { right: 0; left: auto; }
+.pop-notif { width: 372px; max-width: calc(100vw - 24px); padding: 0; overflow: hidden; }
+.notif-head { display: flex; align-items: center; gap: 9px; padding: 13px 16px;
+              border-bottom: 1px solid var(--line); }
+.notif-head h3 { font-size: 13.5px; }
+.notif-head .spacer { flex: 1; }
+.notif-list { max-height: 400px; overflow-y: auto; }
+.nrow { display: grid; grid-template-columns: 30px 1fr; gap: 12px; width: 100%;
+        padding: 13px 16px; border-bottom: 1px solid var(--line); text-align: left;
+        transition: background .14s; }
+.nrow:last-child { border-bottom: none; }
+.nrow:hover { background: var(--hover); }
+.nico { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; }
+.nico svg { width: 15px; height: 15px; }
+.nico.esc  { background: var(--held-bg); color: var(--held); }
+.nico.held { background: var(--held-bg); color: var(--held); }
+.nico.mail { background: var(--physician-bg); color: var(--physician); }
+.nico.chat { background: var(--nursing-bg); color: var(--nursing); }
+.nico.auto { background: var(--tint); color: var(--deep-tx); }
+.nico.done { background: var(--ok-bg); color: var(--ok); }
+.ntxt { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.nsub { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.ntime { font-size: 11px; color: var(--dimmer); margin-top: 3px; }
+
+.pop-who { width: 248px; }
+.pop-who .cap { font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
+                text-transform: uppercase; color: var(--dimmer); font-weight: 600;
+                padding: 9px 12px 5px; }
+
+/* ===================================================================
+   COMMAND PALETTE
+   =================================================================== */
+
+.cmd-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(11,23,37,.44);
+               display: flex; align-items: flex-start; justify-content: center;
+               padding: 12vh 20px 20px; animation: fadeIn .16s ease; }
+@keyframes fadeIn { from { opacity: 0; } }
+.cmd { width: 100%; max-width: 620px; background: var(--surface); border-radius: 20px;
+       box-shadow: 0 40px 90px -30px rgba(11,23,37,.6); overflow: hidden;
+       animation: cmdIn .2s cubic-bezier(.2,.8,.3,1); }
+@keyframes cmdIn { from { opacity: 0; transform: translateY(-10px) scale(.985); } }
+.cmd-input { display: flex; align-items: center; gap: 12px; padding: 17px 20px;
+             border-bottom: 1px solid var(--line); }
+.cmd-input svg { width: 18px; height: 18px; color: var(--dimmer); flex: none; }
+.cmd-input input { flex: 1; border: 0; outline: none; font-size: 15.5px; background: none; }
+.cmd-input input::placeholder { color: var(--dimmer); }
+.cmd-results { max-height: 52vh; overflow-y: auto; padding: 7px; }
+.cmd-group { font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
+             text-transform: uppercase; color: var(--dimmer); font-weight: 600;
+             padding: 11px 13px 6px; }
+.cmd-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 13px;
+            border-radius: 11px; text-align: left; transition: background .12s; }
+.cmd-item:hover, .cmd-item.sel { background: var(--tint); }
+.cmd-item .ci { width: 28px; height: 28px; border-radius: 9px; display: grid;
+                place-items: center; background: var(--bg); color: var(--dim); flex: none; }
+.cmd-item .ci svg { width: 14px; height: 14px; }
+.cmd-item .ct { font-size: 13.5px; font-weight: 500; }
+.cmd-item .cs { font-size: 11.8px; color: var(--dim); margin-top: 1px; }
+.cmd-item .ck { margin-left: auto; font-family: var(--mono); font-size: 10.5px;
+                color: var(--dimmer); }
+.cmd-empty { padding: 34px 20px; text-align: center; color: var(--dimmer); font-size: 13px; }
+
+/* ===================================================================
+   COMMENTS
+   =================================================================== */
+
+.comments { margin-top: 22px; }
+.comment { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 13px 0;
+           border-bottom: 1px solid var(--line); }
+.comment:last-of-type { border-bottom: none; }
+.cm-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 4px; }
+.cm-who { font-family: var(--display); font-size: 13px; font-weight: 700; }
+.cm-role { font-size: 11px; color: var(--dimmer); }
+.cm-time { margin-left: auto; font-size: 11px; color: var(--dimmer); }
+.cm-body { font-size: 13.3px; color: var(--ink-2); line-height: 1.6; }
+.cm-form { display: grid; grid-template-columns: 32px 1fr; gap: 12px; margin-top: 14px; }
+.cm-box { border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+          background: var(--surface); transition: border-color .18s; }
+.cm-box:focus-within { border-color: var(--blue); }
+.cm-box textarea { width: 100%; min-height: 66px; border: 0; outline: none; resize: vertical;
+                   padding: 12px 14px; font-family: var(--body); font-size: 13.3px;
+                   line-height: 1.6; background: none; }
+.cm-bar { display: flex; align-items: center; gap: 9px; padding: 9px 12px;
+          border-top: 1px solid var(--line); background: var(--raised); }
+.cm-bar .hint { font-size: 11px; color: var(--dimmer); }
+
+/* ===================================================================
+   SIGN IN
+   =================================================================== */
+
+.signin { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center;
+          background: linear-gradient(140deg, #0a1826 0%, #14507f 55%, #1f7ec2 100%); }
+.signin::before { content: ""; position: absolute; inset: -30% -10% auto auto;
+                  width: 55%; aspect-ratio: 1; pointer-events: none;
+                  background: radial-gradient(circle, rgba(143,217,255,.45), transparent 62%); }
+.signin-card { position: relative; background: var(--surface); border-radius: 26px;
+               padding: 40px 42px 34px; width: min(400px, calc(100vw - 40px));
+               text-align: center; box-shadow: 0 40px 90px -30px rgba(11,23,37,.6); }
+.signin-logo { height: 30px; width: auto; object-fit: cover; object-position: top center;
+               aspect-ratio: 1100/330; margin-bottom: 18px; }
+.signin-card h1 { font-family: var(--serif); font-size: 27px; font-weight: 400;
+                  margin-bottom: 5px; }
+.signin-card p { margin: 0 0 22px; font-size: 13.5px; color: var(--dim); }
+.signin-card .btn { width: 100%; justify-content: center; padding: 11px; }
+.signin-note { display: block; margin-top: 16px; font-family: var(--mono);
+               font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase;
+               color: var(--dimmer); }
+
+@media (max-width: 1024px) {
+  .shell.collapsed { grid-template-columns: 1fr; }
+  .collapse { display: none; }
+  .cmd-trigger span:not(.kbd) { display: none; }
+  .cmd-trigger { width: auto; padding: 0 11px; }
+  .cmd-trigger .kbd { display: none; }
+  .whotxt { display: none; }
+  .whobtn .chev { display: none; }
+}
+
+.pop button > svg { width: 15px; height: 15px; flex: none; color: var(--dimmer); }
+
+/* Below 1024px the rail becomes an off-canvas drawer with room for labels,
+   so a collapsed state carried over from the desktop must not follow it in. */
+@media (max-width: 1024px) {
+  .shell.collapsed .side { padding: 14px 11px; }
+  .shell.collapsed .nav { width: 100%; height: auto; margin: 0;
+                          justify-content: flex-start; padding: 9px 12px;
+                          border-radius: 11px; }
+  .shell.collapsed .nav > span:not(.n) { display: inline; }
+  .shell.collapsed .nav svg { width: 16px; height: 16px; }
+  .shell.collapsed .nav .n { position: static; display: block; margin-left: auto;
+                             min-width: 22px; height: auto; padding: 1px 8px;
+                             font-size: 11px; line-height: normal;
+                             box-shadow: none; }
+  .shell.collapsed .nav::after { content: none; }
+  .shell.collapsed .nav[aria-current="true"]::before { left: 0; height: 58%; }
+  .shell.collapsed .side-label { font-size: 10px; width: auto; height: auto;
+                                 background: none; padding: 16px 11px 7px; margin: 0; }
+}
+
+
+/* ===================================================================
+   MODAL — used by New ticket
+   =================================================================== */
+
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 210; background: rgba(11,23,37,.44);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 7vh 20px 20px; overflow-y: auto; animation: fadeIn .16s ease;
+}
+.modal {
+  width: 100%; max-width: 620px; background: var(--surface); border-radius: 20px;
+  box-shadow: 0 40px 90px -30px rgba(11,23,37,.6); overflow: hidden;
+  animation: cmdIn .2s cubic-bezier(.2,.8,.3,1);
+}
+.modal-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 17px 20px; border-bottom: 1px solid var(--line);
+}
+.modal-head h2 { font-family: var(--serif); font-size: 21px; font-weight: 400; }
+.modal-head .spacer { flex: 1; }
+.modal-body { padding: 18px 20px 4px; }
+.modal-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px; border-top: 1px solid var(--line); background: var(--raised);
+}
+.modal-foot .spacer { flex: 1; }
+.modal-foot .hint { font-size: 11.5px; color: var(--dimmer); }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.f { margin-bottom: 14px; }
+.f > label {
+  display: block; font-family: var(--display); font-size: 12px; font-weight: 600;
+  color: var(--ink-2); margin-bottom: 5px;
+}
+.f input[type="text"], .f textarea, .f select {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px;
+  font-family: var(--body); font-size: 13.4px; color: var(--ink);
+  background: var(--surface); transition: border-color .16s, box-shadow .16s;
+}
+.f textarea { min-height: 78px; resize: vertical; line-height: 1.55; }
+.f select { appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7d92' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 15px;
+  padding-right: 32px; }
+.f input:focus, .f textarea:focus, .f select:focus {
+  outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--tint);
+}
+.f .sub { font-size: 11.5px; color: var(--dimmer); margin-top: 5px; }
+.f.bad input, .f.bad textarea { border-color: var(--held); }
+.f .err { font-size: 11.5px; color: var(--held); margin-top: 5px; display: none; }
+.f.bad .err { display: block; }
+
+/* The classifier holds clinical wording for a person. A ticket typed by hand
+   bypasses that entirely, so the same signal is surfaced here as a prompt
+   rather than a block - a person is deciding, and may have good reason. */
+.clin-note {
+  display: none; gap: 10px; padding: 11px 13px; margin-bottom: 14px;
+  background: var(--held-bg); border-left: 3px solid var(--held); border-radius: 10px;
+}
+.clin-note.on { display: flex; }
+.clin-note svg { width: 16px; height: 16px; color: var(--held); flex: none; margin-top: 1px; }
+.clin-note .t { font-size: 12.6px; color: var(--ink-2); line-height: 1.5; }
+.clin-note b { font-family: var(--display); font-weight: 700; color: var(--held); }
+
+/* ===================================================================
+   ASK — floating button
+   =================================================================== */
+
+/* A floating target rather than another topbar icon: the topbar is already
+   carrying search, notifications and the account menu, and a fourth icon
+   there went unnoticed. This is the one control that invites a question, so
+   it gets its own place on the page. */
+.fab {
+  position: fixed; right: 24px; bottom: 24px; z-index: 118;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(145deg, var(--deep) 0%, var(--navy-700) 100%);
+  color: #fff; display: grid; place-items: center;
+  box-shadow: 0 16px 34px -12px rgba(11,23,37,.55), 0 0 0 1px rgba(255,255,255,.06) inset;
+  transition: transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s;
+}
+.fab:hover { transform: translateY(-2px); box-shadow: 0 20px 40px -12px rgba(11,23,37,.6); }
+.fab:active { transform: translateY(0); }
+.fab svg { width: 24px; height: 24px; }
+
+/* Names itself on hover so the icon does not have to carry the meaning. */
+.fab::after {
+  content: attr(data-label);
+  position: absolute; right: calc(100% + 12px); top: 50%;
+  transform: translateY(-50%) translateX(5px);
+  background: var(--navy-800); color: var(--nav-ink);
+  font-family: var(--display); font-size: 12.5px; font-weight: 600;
+  padding: 6px 12px; border-radius: 9px; white-space: nowrap;
+  box-shadow: var(--shadow-3); opacity: 0; pointer-events: none;
+  transition: opacity .16s, transform .16s;
+}
+.fab:hover::after { opacity: 1; transform: translateY(-50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fab, .fab::after { transition: none; }
+  .fab:hover { transform: none; }
+}
+
+@media (max-width: 1024px) {
+  /* Clear of the home indicator on phones that have one. */
+  .fab { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+         width: 52px; height: 52px; }
+  .fab::after { display: none; }
+}
+
+/* ===================================================================
+   ASK PANEL
+   =================================================================== */
+
+.askpanel {
+  position: fixed; top: var(--topbar); right: 0; bottom: 0; width: 404px;
+  z-index: 120; background: var(--surface); border-left: 1px solid var(--line);
+  box-shadow: -24px 0 60px -30px rgba(11,23,37,.4);
+  display: flex; flex-direction: column;
+  animation: askIn .26s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes askIn { from { transform: translateX(22px); opacity: 0; } }
+
+.ask-head {
+  display: flex; align-items: center; gap: 11px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+}
+.ask-mark {
+  width: 30px; height: 30px; border-radius: 10px; background: var(--grad);
+  display: grid; place-items: center; color: #06243c; flex: none;
+}
+.ask-mark svg { width: 16px; height: 16px; }
+.ask-head h2 { font-family: var(--display); font-size: 14px; font-weight: 700; }
+.ask-head .sub { font-size: 11.5px; color: var(--dimmer); margin-top: 1px; }
+.ask-head .spacer { flex: 1; }
+
+.ask-log { flex: 1; overflow-y: auto; padding: 16px; }
+.ask-msg { margin-bottom: 14px; }
+.ask-msg.you { display: flex; justify-content: flex-end; }
+.ask-msg.you .bub {
+  background: var(--deep); color: #fff; border-radius: 14px 14px 4px 14px;
+  padding: 9px 13px; font-size: 13.2px; max-width: 80%; line-height: 1.5;
+}
+.ask-msg.bot .bub {
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 14px 14px 14px 4px; padding: 11px 13px;
+  font-size: 13.2px; line-height: 1.55; color: var(--ink-2);
+}
+.ask-msg.bot .bub b { font-family: var(--display); color: var(--ink); font-weight: 700; }
+.ask-hits { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ask-hit {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  text-align: left; transition: border-color .15s, background .15s;
+}
+.ask-hit:hover { border-color: var(--blue); background: var(--tint); }
+.ask-hit .k { font-family: var(--mono); font-size: 11px; color: var(--deep-tx); flex: none; }
+.ask-hit .s { font-size: 12.4px; flex: 1; overflow: hidden;
+              text-overflow: ellipsis; white-space: nowrap; }
+
+.ask-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.ask-chip {
+  padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 12.2px; color: var(--ink-2);
+  transition: border-color .15s, background .15s;
+}
+.ask-chip:hover { border-color: var(--blue); background: var(--tint); }
+
+.ask-foot { padding: 12px 14px; border-top: 1px solid var(--line); background: var(--raised); }
+.ask-box {
+  display: flex; align-items: flex-end; gap: 8px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 14px; padding: 6px 6px 6px 13px;
+  transition: border-color .16s;
+}
+.ask-box:focus-within { border-color: var(--blue); }
+.ask-box input {
+  flex: 1; border: 0; outline: none; background: none; padding: 7px 0;
+  font-family: var(--body); font-size: 13.3px; color: var(--ink);
+}
+.ask-send {
+  width: 32px; height: 32px; border-radius: 10px; background: var(--deep);
+  color: #fff; display: grid; place-items: center; flex: none;
+  transition: opacity .16s, transform .16s;
+}
+.ask-send:hover { transform: translateY(-1px); }
+.ask-send:disabled { opacity: .4; transform: none; }
+.ask-send svg { width: 15px; height: 15px; }
+.ask-note {
+  display: block; margin-top: 9px; font-size: 11px; color: var(--dimmer);
+  line-height: 1.45; text-align: center;
+}
+
+/* The panel overlays the content rather than resizing the grid: re-flowing a
+   board behind a transient panel is more disruptive than covering part of it. */
+.ask-scrim { position: fixed; inset: var(--topbar) 0 0 0; z-index: 115;
+             background: rgba(12,26,43,.18); animation: fadeIn .2s ease; }
+
+@media (max-width: 1024px) {
+  .askpanel { width: 100%; border-left: 0; }
+  .ask-scrim { display: none; }
+}
+@media (max-width: 620px) {
+  .field-row { grid-template-columns: 1fr; gap: 0; }
+  .modal-overlay { padding: 0; }
+  .modal { max-width: none; min-height: 100%; border-radius: 0; }
+}
+
+/* The overlays set their own display (grid/flex) to lay themselves out, and an
+   author rule beats the browser's own [hidden] { display: none }. Without this
+   the sign-in screen and the command palette are painted on every page load
+   and toggling .hidden from script does nothing. Hidden means hidden. */
+[hidden] { display: none !important; }
+
+/* Which data is on screen. A console quietly showing invented tickets while
+   looking live is the worst outcome, so it is stated, not implied. */
+.srcbadge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px 4px 9px; border-radius: 999px;
+  font-family: var(--display); font-size: 11.5px; font-weight: 600;
+  border: 1px solid var(--line); background: var(--bg); color: var(--dim);
+}
+.srcbadge::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--dimmer); flex: none;
+}
+.srcbadge.on { background: var(--ok-bg); border-color: transparent; color: var(--ok); }
+.srcbadge.on::before { background: var(--ok); }
+.srcbadge.demo { background: var(--warn-bg); border-color: transparent; color: var(--warn); }
+.srcbadge.demo::before { background: var(--warn); }
+@media (max-width: 760px) { .srcbadge { display: none; } }

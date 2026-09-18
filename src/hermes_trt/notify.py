@@ -92,7 +92,10 @@ def send_alert(
 
     try:
         proc = subprocess.run(
-            [str(HERMES_BIN), "send", target, message],
+            # The target is a flag, not a positional. `hermes send` takes one
+            # positional (the message); passing the target positionally makes
+            # argparse reject the call, which looked like a delivery failure.
+            [str(HERMES_BIN), "send", "-t", target, message],
             capture_output=True, text=True, timeout=timeout,
         )
     except (OSError, subprocess.TimeoutExpired) as err:

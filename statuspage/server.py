@@ -303,7 +303,8 @@ no controls, no configuration, no client data.</p>
 </div></body></html>"""
 
 
-CONSOLE_DIR = Path(__file__).resolve().parent / "console"
+#: v2 is the console. v1 is kept on disk for reference but is not served.
+CONSOLE_DIR = Path(__file__).resolve().parent / "console-v2"
 
 #: Only these files are servable. An allowlist rather than path arithmetic:
 #: this is going behind a public URL, and a traversal bug here would expose
@@ -346,6 +347,16 @@ class Handler(BaseHTTPRequestHandler):
 
         if path.startswith("/health"):
             self._send(json.dumps({"ok": True, "gateway": gateway_up()}).encode(),
+                       "application/json")
+            return
+
+        if path.startswith("/api/console"):
+            try:
+                from hermes_trt.console_api import state as console_state
+                payload = console_state()
+            except Exception as err:  # noqa: BLE001 - never 500 the console
+                payload = {"live": False, "error": str(err), "tickets": []}
+            self._send(json.dumps(payload, default=str).encode(),
                        "application/json")
             return
 
