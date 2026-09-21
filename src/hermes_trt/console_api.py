@@ -17,6 +17,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from . import clients
+
 HERMES = Path.home() / ".local" / "bin" / "hermes"
 
 #: Hermes task status -> the four columns the board shows. `triage` means the
@@ -93,6 +95,54 @@ def parse_body(raw: str) -> dict:
     }
 
 
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def _first_sentence(text: str) -> str:
+    para = (text or "").split("\n\n", 1)[0]
+    joined = " ".join(ln.strip() for ln in para.splitlines() if ln.strip())
+    if not joined:
+        return ""
+    first = _SENTENCE_END.split(joined, maxsplit=1)[0].strip()
+    if len(first) <= 100:
+        return first
+    cut = first[:97]
+    if " " in cut:
+        cut = cut[:cut.rfind(" ")]
+    return cut + "..."
+
+
+def display_title(stored: str, message: str, subject: str) -> str:
+    """A readable title for the board.
+
+    Some stored titles stop mid-thought - "...twelve-week review? He's" -
+    because they were cut at a character count. Rather than rewrite the task
+    itself, which would edit the audit record, the title is repaired here at
+    read time: the board keeps what the classifier wrote, the console shows
+    something a person can scan.
+
+    A title is only repaired when it is demonstrably a truncated copy of the
+    message: it appears verbatim at the start of the text AND does not end on
+    sentence punctuation. A paraphrase written by a model is left alone, even
+    a short one, because it is not evidence of truncation - and a title that
+    legitimately ends on a word like "back" is not touched either.
+    """
+    stored = (stored or "").strip()
+    body = " ".join((message or "").split())
+    if not stored:
+        return _first_sentence(message) or subject.strip() or "(untitled)"
+
+    flat = " ".join(stored.split())
+    truncated = (
+        body.lower().startswith(flat.lower())     # verbatim prefix of the message
+        and not flat.endswith((".", "!", "?"))    # and stops mid-sentence
+        and len(flat) < len(body)
+    )
+    if not truncated:
+        return stored
+    return _first_sentence(message) or stored
+
+
 def _age(created_at) -> str:
     """Human age, matching how the console words it elsewhere."""
     try:
@@ -161,13 +211,19 @@ def tickets() -> list[dict]:
 
         out.append({
             "key": t.get("id", ""),
-            "sum": t.get("title") or parsed["subject"] or "(untitled)",
+            "sum": display_title(t.get("title") or "", parsed["message"],
+                                 parsed["subject"]),
             "type": "clinical" if queue in ("physician", "held") else "admin",
             "q": queue,
             "st": STATUS_MAP.get(status, "open"),
             "pri": pri,
             "due": dl["days"] if dl else None,
-            "client": parsed["client"] or "—",
+            # Resolved against the registry, falling back to whatever the
+            # classifier recorded. That is what collapses "Daniel",
+            # "d.whitcombe" and "Daniel Whitcombe" into one person on the
+            # board without rewriting the tickets themselves.
+            "client": (clients.resolve(parsed["from"], parsed["message"])
+                       or parsed["client"] or "—"),
             "from": parsed["from"] or "Automated check",
             "ch": {"email": "email", "slack": "slack"}.get(source, "system"),
             "age": _age(t.get("created_at")),

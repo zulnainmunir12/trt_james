@@ -1,7 +1,7 @@
 """The chain: message in, ticket and deadline out.
 
     inbound message
-        -> classify           (Gemini decides the route)
+        -> classify           (the configured model proposes a route)
         -> safety rules       (deterministic; can only route towards a human)
         -> kanban ticket      (or nothing, if it is noise)
         -> response deadline  (so the daily sweep can chase it)
@@ -12,16 +12,38 @@ when the step before it went wrong.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
-from .classify import ProviderUnavailable, classify
+from .classify import ProviderUnavailable, classify as classify_gemini
 from .config import ProviderConfig
 from .models import InboundMessage, Route, RoutingDecision
 from .sla import build_deadline
 from .store import DeadlineStore
 from .tickets import Ticket, TicketError, create_ticket
+
+
+#: Which model proposes the route. Selectable rather than swapped in place,
+#: so a bad result can be reverted with an environment variable instead of a
+#: deploy, and so both can be compared on the same traffic.
+#:
+#: The safety rules run after whichever one is chosen and are not affected.
+CLASSIFIER = os.environ.get("HERMES_TRT_CLASSIFIER", "gemini").strip().lower()
+
+
+def _classify(message: InboundMessage, cfg: Optional[ProviderConfig]) -> RoutingDecision:
+    if CLASSIFIER == "jev":
+        # Imported lazily: the Gemini path must keep working on a machine
+        # that has no TypeSafe key and has never installed anything for it.
+        from .jev import JevUnavailable, classify as classify_jev
+        try:
+            return classify_jev(message, cfg)
+        except JevUnavailable as err:
+            # Same contract as the Gemini path: not assessed, so no ticket.
+            raise ProviderUnavailable(str(err)) from err
+    return classify_gemini(message, cfg)
 
 
 @dataclass
@@ -67,7 +89,7 @@ def process(
     #    so we must NOT raise a ticket guessing at a route - leave it for
     #    the next poll.
     try:
-        outcome.decision = classify(message, cfg)
+        outcome.decision = _classify(message, cfg)
     except ProviderUnavailable as err:
         outcome.error = f"provider unavailable, message not assessed: {err}"
         return outcome

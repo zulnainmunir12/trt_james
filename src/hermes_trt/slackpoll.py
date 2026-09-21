@@ -135,9 +135,24 @@ def humanise(text: str, names: dict[str, str]) -> str:
 
 
 def subject_of(text: str) -> str:
-    """Slack messages have no subject. Use the first line, trimmed."""
-    first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
-    return (first[:97] + "...") if len(first) > 100 else (first or "(no text)")
+    """Slack messages have no subject, so make one from the first sentence.
+
+    Not the first LINE: Slack wraps as a person types, so a sentence
+    routinely spans two lines and a line-based subject ends mid-clause
+    ("...have come back"). Paragraph breaks are still honoured - a blank
+    line means a new thought, and only the first one is wanted.
+    """
+    para = text.split("\n\n", 1)[0]
+    joined = " ".join(ln.strip() for ln in para.splitlines() if ln.strip())
+    if not joined:
+        return "(no text)"
+    first = re.split(r"(?<=[.!?])\s+", joined, maxsplit=1)[0].strip()
+    if len(first) <= 100:
+        return first
+    cut = first[:97]
+    if " " in cut:
+        cut = cut[:cut.rfind(" ")]
+    return cut + "..."
 
 
 class Names:
