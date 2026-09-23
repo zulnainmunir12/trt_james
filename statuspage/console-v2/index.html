@@ -178,16 +178,20 @@
 
       <div class="f">
         <label for="nt-due">Target</label>
-        <select id="nt-due">
-          <option value="">No target date</option>
-          <option value="0">Today</option>
-          <option value="1">Tomorrow</option>
-          <option value="3">In 3 days</option>
-          <option value="7">In a week</option>
-          <option value="14">In 2 weeks</option>
-          <option value="30">In a month</option>
-        </select>
-        <div class="sub">Anything past its target is escalated by the daily sweep.</div>
+        <div class="date-row">
+          <input id="nt-due" type="date">
+          <button class="btn ghost sm" data-due="clear" type="button">No date</button>
+        </div>
+        <div class="quick-dates">
+          <button class="chip-date" data-due="0" type="button">Today</button>
+          <button class="chip-date" data-due="1" type="button">Tomorrow</button>
+          <button class="chip-date" data-due="7" type="button">1 week</button>
+          <button class="chip-date" data-due="14" type="button">2 weeks</button>
+          <button class="chip-date" data-due="30" type="button">1 month</button>
+          <button class="chip-date" data-due="56" type="button">8 weeks</button>
+        </div>
+        <div class="sub">Pick any date, or use a shortcut. Anything past its
+          target is escalated by the daily sweep.</div>
       </div>
     </div>
     <div class="modal-foot">

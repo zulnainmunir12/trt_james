@@ -315,6 +315,7 @@ STATIC = {
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/trt-logo.webp": ("trt-logo.webp", "image/webp"),
+    "/_m.html": ("_m.html", "text/html; charset=utf-8"),
 }
 
 
@@ -381,9 +382,73 @@ class Handler(BaseHTTPRequestHandler):
         self._send(b"Not found", "text/plain; charset=utf-8", 404)
 
     def do_POST(self) -> None:  # noqa: N802
-        # Read-only by design: nothing here should ever accept input.
-        self.send_response(405)
-        self.end_headers()
+        """The console's write path.
+
+        There is no authentication yet, which is a deliberate, temporary
+        state agreed for the demo: the console is reachable over a tunnel
+        and anyone with that link can move work. Before this is pointed at
+        the clinic's real data it needs a login, and these handlers are the
+        surface that has to be behind it.
+
+        Deliberately narrow even so - each route does one thing and
+        validates its own input, rather than accepting a general update.
+        """
+        path = self.path.split("?", 1)[0]
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:  # noqa: BLE001
+            self._send(json.dumps({"ok": False, "error": "bad JSON"}).encode(),
+                       "application/json", 400)
+            return
+
+        if path == "/api/ticket/status":
+            self._ticket_status(payload)
+            return
+
+        if path == "/api/schedule":
+            self._schedule(payload)
+            return
+
+        self._send(json.dumps({"ok": False, "error": "unknown route"}).encode(),
+                   "application/json", 404)
+
+    def _schedule(self, payload: dict) -> None:
+        """Change when a routine runs, or pause it."""
+        try:
+            from hermes_trt.schedules import ScheduleError, set_enabled, set_schedule
+            job = str(payload.get("id", ""))
+            if "enabled" in payload:
+                job_state = set_enabled(job, bool(payload["enabled"]))
+            else:
+                job_state = set_schedule(job, str(payload.get("schedule", "")))
+        except ScheduleError as err:
+            self._send(json.dumps({"ok": False, "error": str(err)}).encode(),
+                       "application/json", 400)
+            return
+        except Exception as err:  # noqa: BLE001
+            self._send(json.dumps({"ok": False, "error": str(err)}).encode(),
+                       "application/json", 500)
+            return
+        self._send(json.dumps({"ok": True, "job": job_state}).encode(),
+                   "application/json")
+
+    def _ticket_status(self, payload: dict) -> None:
+        try:
+            from hermes_trt.board import BoardError, set_status
+            result = set_status(str(payload.get("id", "")),
+                                str(payload.get("status", "")),
+                                str(payload.get("by", "")))
+        except BoardError as err:
+            self._send(json.dumps({"ok": False, "error": str(err)}).encode(),
+                       "application/json", 400)
+            return
+        except Exception as err:  # noqa: BLE001
+            self._send(json.dumps({"ok": False, "error": str(err)}).encode(),
+                       "application/json", 500)
+            return
+        self._send(json.dumps({"ok": True, **result}).encode(),
+                   "application/json")
 
     def log_message(self, fmt: str, *args) -> None:
         pass

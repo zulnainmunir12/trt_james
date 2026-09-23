@@ -17,7 +17,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import clients
+from . import board, clients
 
 HERMES = Path.home() / ".local" / "bin" / "hermes"
 
@@ -143,6 +143,44 @@ def display_title(stored: str, message: str, subject: str) -> str:
     return _first_sentence(message) or stored
 
 
+def display_client(sender: str, message: str, recorded: str) -> str:
+    """Who this ticket is about, for the board.
+
+    The registry answers first. Where it cannot, the name the old classifier
+    recorded is used only if it could actually identify someone: two or more
+    words, and not an address fragment. That rules out "Daniel", which the
+    model produced for Daniel Whitcombe and which otherwise appears as a
+    second person on the Clients view.
+    """
+    found = clients.resolve(sender, message)
+    if found:
+        return found
+
+    name = " ".join((recorded or "").split())
+    if not name or name == "—":
+        return "—"
+    if clients._LOOKS_LIKE_LOCALPART.match(name.lower()):
+        return "—"
+    if len(name.split()) < 2:
+        return "—"
+    return name
+
+
+def display_sender(sender: str, source: str) -> str:
+    """The From line shown on a ticket.
+
+    Test messages were sent from our own mailbox while standing in for a
+    client, so the raw address is ours, not theirs. Showing it puts our
+    address in the Contact column of the Clients view. Fall back to naming
+    the channel instead, which is true and carries no one's address.
+    """
+    sender = (sender or "").strip()
+    if sender and not clients._OURS.search(sender):
+        return sender
+    return {"email": "Client email",
+            "slack": "Internal message"}.get(source, "Automated check")
+
+
 def _age(created_at) -> str:
     """Human age, matching how the console words it elsewhere."""
     try:
@@ -215,16 +253,15 @@ def tickets() -> list[dict]:
                                  parsed["subject"]),
             "type": "clinical" if queue in ("physician", "held") else "admin",
             "q": queue,
-            "st": STATUS_MAP.get(status, "open"),
+            # Where a person moved it wins over the state Hermes reports,
+            # which describes agent execution rather than the clinic's work.
+            "st": board.status_of(t.get("id", ""), status,
+                                  STATUS_MAP.get(status, "open")),
             "pri": pri,
             "due": dl["days"] if dl else None,
-            # Resolved against the registry, falling back to whatever the
-            # classifier recorded. That is what collapses "Daniel",
-            # "d.whitcombe" and "Daniel Whitcombe" into one person on the
-            # board without rewriting the tickets themselves.
-            "client": (clients.resolve(parsed["from"], parsed["message"])
-                       or parsed["client"] or "—"),
-            "from": parsed["from"] or "Automated check",
+            "client": display_client(parsed["from"], parsed["message"],
+                                     parsed["client"]),
+            "from": display_sender(parsed["from"], source),
             "ch": {"email": "email", "slack": "slack"}.get(source, "system"),
             "age": _age(t.get("created_at")),
             "why": parsed["reason"] or "No routing note was recorded.",
@@ -238,8 +275,14 @@ def tickets() -> list[dict]:
 def state() -> dict:
     """Everything the console needs, in one response."""
     rows = tickets()
+    try:
+        from hermes_trt.schedules import jobs
+        routines = jobs()
+    except Exception:  # noqa: BLE001 - the board must render without them
+        routines = []
     return {
         "live": True,
+        "schedules": routines,
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "tickets": rows,
         "counts": {

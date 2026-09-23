@@ -421,7 +421,7 @@
     var cols = ["open", "progress", "waiting", "resolved"];
     return '<div class="board">' + cols.map(function (c) {
       var items = rows.filter(function (t) { return t.st === c; });
-      return '<section class="col"><div class="col-head">' +
+      return '<section class="col" data-col="' + c + '"><div class="col-head">' +
         '<span class="nm">' + STATUS[c].label + "</span>" +
         '<span class="n">' + items.length + "</span></div>" +
         '<div class="col-body">' +
@@ -549,6 +549,16 @@
       "</div></div><aside class='det-side'>" +
         '<div class="card"><h3 class="eyebrow">Details</h3>' +
           '<div class="field"><span class="k">Status</span><span class="v">' + statusEl(t.st) + "</span></div>" +
+          // Cards cannot be dragged on a touch screen, so the same move is
+          // available here. Live data only: on the sample set there is
+          // nothing to write to.
+          (live ? '<div class="st-picker">' +
+            ["open", "progress", "waiting", "resolved"].map(function (k) {
+              return '<button class="st-opt" data-move="' + k + '" aria-pressed="' +
+                (t.st === k) + '">' + esc(STATUS[k].label) + "</button>";
+            }).join("") + "</div>" +
+            '<div class="st-note">Resolving also closes any deadline being ' +
+            "tracked against this ticket.</div>" : "") +
           '<div class="field"><span class="k">Queue</span><span class="v">' + tag(QUEUE[t.q].label, QUEUE[t.q].cls) + "</span></div>" +
           '<div class="field"><span class="k">Priority</span><span class="v">' + priorityEl(t.pri) + "</span></div>" +
           '<div class="field"><span class="k">Type</span><span class="v">' + esc(TYPE[t.type]) + "</span></div>" +
@@ -568,6 +578,9 @@
       "</aside></div></div>";
 
     $("back").onclick = function () { state.ticket = null; render(); };
+    document.querySelectorAll("[data-move]").forEach(function (b) {
+      b.onclick = function () { moveTicket(t.key, b.getAttribute("data-move"), null); };
+    });
     wireComments(t);
   }
 
@@ -630,7 +643,9 @@
     var max = Math.max(1, loadOf("physician"), loadOf("nursing"), loadOf("support"));
 
     $("main").innerHTML = '<div class="wrap">' +
-      '<div class="hero"><h1>' + greet + ", Alex</h1><p>" +
+      // First name of whoever is signed in, not a hardcoded one.
+      '<div class="hero"><h1>' + greet + ", " +
+        esc(me().name.split(/\s+/)[0]) + "</h1><p>" +
       (need ? (need === 1 ? "One thing needs you" : need + " things need you") +
               (h < 12 ? " this morning." : h < 18 ? " this afternoon." : " this evening.")
             : "Nothing is waiting on you.") + "</p></div>" +
@@ -748,6 +763,8 @@
           "</div></div>" +
       "</div>" +
 
+      routinesBlock() +
+
       '<div class="card" style="padding:4px 18px 16px">' +
       plan.map(function (p) {
         var d = on(p[0]);
@@ -862,6 +879,8 @@
   var baseRender = render;
   render = function () {
     baseRender();
+    wireDragAndDrop();
+    wireRoutines();
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       stagger();
       if (state.tab === "overview" && !state.ticket) countUp();
@@ -1211,6 +1230,26 @@
     return CLINICAL.some(function (re) { return re.test(text); });
   }
 
+  function daysUntil(value) {
+    if (!value) return null;
+    var picked = new Date(value + "T00:00:00");
+    if (isNaN(picked.getTime())) return null;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((picked - today) / 86400000);
+  }
+
+  function dateInDays(n) {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    // toISOString would shift by the timezone offset and land on the wrong
+    // day for anyone east of UTC, which is everyone here.
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
   function ntCheck() {
     var text = $("nt-sum").value + " " + $("nt-body").value;
     var q = $("nt-queue").value;
@@ -1246,11 +1285,14 @@
     var sum = $("nt-sum").value.trim();
     if (!sum) { $("f-sum").classList.add("bad"); $("nt-sum").focus(); return; }
 
-    var due = $("nt-due").value;
+    // The form now takes a date, the board thinks in days-from-today.
+    // Compare at midnight so a ticket created this afternoon and due
+    // tomorrow reads as 1 day, not 0.
+    var due = daysUntil($("nt-due").value);
     var t = {
       key: nextKey(), sum: sum, type: $("nt-type").value, q: $("nt-queue").value,
       st: "open", pri: $("nt-pri").value,
-      due: due === "" ? null : parseInt(due, 10),
+      due: due,
       client: $("nt-client").value.trim() || "—",
       from: me().name, fromRole: me().role, ch: "manual", age: "just now",
       why: "Raised by hand by " + me().name + " (" + me().role + "), not by the " +
@@ -1277,6 +1319,12 @@
       });
     });
     $("nt-queue").addEventListener("change", ntCheck);
+    ntOverlay.querySelectorAll("[data-due]").forEach(function (b) {
+      b.onclick = function () {
+        var v = b.getAttribute("data-due");
+        $("nt-due").value = v === "clear" ? "" : dateInDays(parseInt(v, 10));
+      };
+    });
     ntOverlay.addEventListener("click", function (e) {
       if (e.target === ntOverlay) ntClose();
     });
@@ -1504,6 +1552,321 @@
     });
   }
 
+
+  /* ------------------------------------------------ moving work */
+
+  /* Dragging a card writes the new column straight back to the system.
+   * Only when the board is live: on the sample data there is nothing to
+   * write to, and a drag that appears to work and silently does nothing is
+   * worse than one that is plainly unavailable.
+   *
+   * The card moves as soon as it is dropped rather than waiting for the
+   * round trip - a board that lags behind the hand feels broken - and it
+   * moves back if the write fails. */
+
+  function moveTicket(key, status, card) {
+    var t = T.filter(function (x) { return x.key === key; })[0];
+    if (!t || t.st === status) return;
+
+    var previous = t.st;
+    t.st = status;
+    if (card) card.classList.add("saving");
+    render();
+
+    fetch("/api/ticket/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: key, status: status, by: me().name }),
+    })
+      .then(function (r) { return r.json().catch(function () { return null; }); })
+      .then(function (d) {
+        if (!d || !d.ok) throw new Error((d && d.error) || "write failed");
+        t.acts = t.acts || [];
+        t.acts.push([
+          "Moved to " + STATUS[status].label + " by " + me().name,
+          "just now",
+        ]);
+        if (d.deadlines_closed) {
+          t.acts.push([
+            "Closed " + d.deadlines_closed +
+            (d.deadlines_closed === 1 ? " tracked deadline" : " tracked deadlines"),
+            "just now",
+          ]);
+          t.due = null;
+        }
+        render();
+        flash(key, "saved");
+      })
+      .catch(function (err) {
+        // Put it back. Leaving it in the new column would show the person a
+        // state the system does not actually have.
+        t.st = previous;
+        render();
+        flash(key, "failed");
+        toast("Could not move " + key + ": " + err.message);
+      });
+  }
+
+  function flash(key, cls) {
+    var el = document.querySelector('[data-key="' + key + '"]');
+    if (!el) return;
+    el.classList.remove("saving");
+    el.classList.add(cls);
+    setTimeout(function () { el.classList.remove(cls); }, 1400);
+  }
+
+  function toast(text) {
+    var el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, 5000);
+  }
+
+  function wireDragAndDrop() {
+    var board = document.querySelector(".board");
+    if (!board || !live) return;
+    board.classList.add("live");
+
+    var dragging = null;
+
+    board.querySelectorAll(".ticket").forEach(function (card) {
+      card.setAttribute("draggable", "true");
+      card.addEventListener("dragstart", function (e) {
+        dragging = card.getAttribute("data-key");
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        // Firefox will not start a drag without data set.
+        e.dataTransfer.setData("text/plain", dragging);
+      });
+      card.addEventListener("dragend", function () {
+        card.classList.remove("dragging");
+        board.querySelectorAll(".col").forEach(function (c) {
+          c.classList.remove("drop");
+        });
+        dragging = null;
+      });
+    });
+
+    board.querySelectorAll(".col").forEach(function (col) {
+      col.addEventListener("dragover", function (e) {
+        if (!dragging) return;
+        e.preventDefault();               // without this, no drop fires
+        e.dataTransfer.dropEffect = "move";
+        col.classList.add("drop");
+      });
+      col.addEventListener("dragleave", function (e) {
+        // Moving between a column's own children fires dragleave on the
+        // column; ignore those or the highlight strobes.
+        if (!col.contains(e.relatedTarget)) col.classList.remove("drop");
+      });
+      col.addEventListener("drop", function (e) {
+        e.preventDefault();
+        col.classList.remove("drop");
+        var key = dragging || e.dataTransfer.getData("text/plain");
+        var status = col.getAttribute("data-col");
+        if (key && status) {
+          moveTicket(key, status,
+                     document.querySelector('[data-key="' + key + '"]'));
+        }
+      });
+    });
+  }
+
+
+  /* ------------------------------------------- editable routines */
+
+  /* The routines the clinic can adjust for themselves. Reads come from the
+   * same payload as the tickets; writes go one field at a time so a failed
+   * change never leaves the form and the system disagreeing.
+   *
+   * Only rendered against live data - on the sample set there is no
+   * scheduler to talk to, and an editable control that silently does
+   * nothing is worse than a static one. */
+
+  var SCHEDULES = [];
+
+  /* A schedule in words.
+   *
+   * "Runs 0 9 * * *" is meaningless to anyone who does not write cron, and
+   * the asterisks read as corrupted text next to ordinary prose. The raw
+   * expression is still shown, but quietly and after the plain version, so
+   * it can be checked without being the first thing read. */
+
+  var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
+                   "Friday", "Saturday"];
+
+  function clockTime(hour, minute) {
+    var h = parseInt(hour, 10);
+    var m = parseInt(minute, 10);
+    // Out-of-range fields mean this is not a shape we understand. Returning
+    // null sends it back to showing the raw expression, which is honest;
+    // an hour of 30 would otherwise render as a confident, wrong "6pm".
+    if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    var suffix = h < 12 ? "am" : "pm";
+    var display = h % 12 === 0 ? 12 : h % 12;
+    return display + (m ? ":" + String(m).padStart(2, "0") : "") + suffix;
+  }
+
+  function readableSchedule(expr) {
+    expr = (expr || "").trim();
+    if (!expr) return "not scheduled";
+
+    // "every 2m" / "30m" / "every 2h"
+    var iv = expr.match(/^(?:every\s+)?(\d+)\s*(m|min(?:ute)?s?|h|hrs?|hours?|d|days?)$/i);
+    if (iv) {
+      var n = parseInt(iv[1], 10);
+      var unit = iv[2].toLowerCase();
+      var word = unit.charAt(0) === "m" ? "minute"
+               : unit.charAt(0) === "h" ? "hour" : "day";
+      if (n === 1) return "every " + word;
+      return "every " + n + " " + word + "s";
+    }
+
+    // Five-field cron. Only the shapes we actually produce are spelled out;
+    // anything more exotic keeps its raw form rather than being described
+    // wrongly, which would be worse than not describing it at all.
+    var f = expr.split(/\s+/);
+    if (f.length === 5) {
+      var min = f[0], hour = f[1], dom = f[2], mon = f[3], dow = f[4];
+      var at = clockTime(hour, min);
+      if (at && dom === "*" && mon === "*") {
+        if (dow === "*") return "every day at " + at;
+        if (dow === "1-5") return "every weekday at " + at;
+        if (/^[0-6]$/.test(dow)) return "every " + DAY_NAMES[+dow] + " at " + at;
+      }
+      if (at && dom !== "*" && mon === "*" && dow === "*") {
+        return "on the " + ordinal(+dom) + " of each month at " + at;
+      }
+    }
+    return expr;
+  }
+
+  function ordinal(n) {
+    if (n % 100 >= 11 && n % 100 <= 13) return n + "th";
+    return n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th");
+  }
+
+
+  function schedulePresets() {
+    return [
+      ["0 7 * * *", "Every day at 7am"],
+      ["0 9 * * *", "Every day at 9am"],
+      ["0 17 * * *", "Every day at 5pm"],
+      ["0 9 * * 1-5", "Every weekday at 9am"],
+      ["every 2m", "Every 2 minutes"],
+      ["every 3m", "Every 3 minutes"],
+      ["every 5m", "Every 5 minutes"],
+      ["every 30m", "Every 30 minutes"],
+      ["every 1h", "Every hour"],
+    ];
+  }
+
+  function routineHTML(j) {
+    var presets = schedulePresets()
+      .map(function (p) {
+        return '<option value="' + esc(p[0]) + '"' +
+          (p[0] === j.schedule ? " selected" : "") + ">" + esc(p[1]) + "</option>";
+      }).join("");
+
+    return '<div class="routine-row" data-job="' + esc(j.id) + '">' +
+      '<div class="rr-main">' +
+        '<div class="rr-name">' + esc(j.label) +
+          (j.enabled ? "" : '<span class="rr-off">Paused</span>') + "</div>" +
+        (j.blurb ? '<div class="rr-blurb">' + esc(j.blurb) + "</div>" : "") +
+      "</div>" +
+      '<div class="rr-controls">' +
+        '<select class="rr-preset" aria-label="Schedule for ' + esc(j.label) + '">' +
+          presets +
+          '<option value="__custom">Custom...</option>' +
+        "</select>" +
+        '<input class="rr-custom" type="text" hidden placeholder="e.g. 0 8 * * 1-5" ' +
+          'value="' + esc(j.schedule) + '" aria-label="Custom schedule">' +
+        '<button class="btn ghost sm rr-toggle">' +
+          (j.enabled ? "Pause" : "Resume") + "</button>" +
+      "</div>" +
+      '<div class="rr-now">Runs <b>' + esc(readableSchedule(j.schedule)) + "</b>" +
+        '<code class="rr-raw">' + esc(j.schedule) + "</code></div>" +
+      "</div>";
+  }
+
+  function routinesBlock() {
+    if (!live || !SCHEDULES.length) return "";
+    return '<div class="card routines-card">' +
+      '<h3 class="eyebrow">When these run</h3>' +
+      '<p class="rr-intro">Change the timing to suit the clinic. A change ' +
+      "takes effect from the next run; nothing already scheduled is lost.</p>" +
+      SCHEDULES.map(routineHTML).join("") + "</div>";
+  }
+
+  function saveSchedule(row, body) {
+    row.classList.add("saving");
+    fetch("/api/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(function (r) { return r.json().catch(function () { return null; }); })
+      .then(function (d) {
+        row.classList.remove("saving");
+        if (!d || !d.ok) throw new Error((d && d.error) || "change refused");
+        // Replace our copy with what the scheduler actually holds, rather
+        // than assuming the change landed as typed.
+        SCHEDULES = SCHEDULES.map(function (j) {
+          return j.id === d.job.id ? d.job : j;
+        });
+        render();
+        toast("Saved. " + d.job.label + " now runs " +
+              readableSchedule(d.job.schedule) + ".");
+      })
+      .catch(function (err) {
+        row.classList.remove("saving");
+        render();                       // put the controls back as they were
+        toast(err.message);
+      });
+  }
+
+  function wireRoutines() {
+    document.querySelectorAll(".routine-row").forEach(function (row) {
+      var id = row.getAttribute("data-job");
+      var preset = row.querySelector(".rr-preset");
+      var custom = row.querySelector(".rr-custom");
+
+      // A schedule not in the list shows as Custom with the box already open.
+      var known = schedulePresets().some(function (p) {
+        return p[0] === custom.value;
+      });
+      if (!known) { preset.value = "__custom"; custom.hidden = false; }
+
+      preset.onchange = function () {
+        if (preset.value === "__custom") {
+          custom.hidden = false;
+          custom.focus();
+          return;
+        }
+        custom.hidden = true;
+        saveSchedule(row, { id: id, schedule: preset.value });
+      };
+
+      custom.onkeydown = function (e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        saveSchedule(row, { id: id, schedule: custom.value });
+      };
+      custom.onblur = function () {
+        var current = row.querySelector(".rr-now b");
+        if (custom.value.trim() && custom.value.trim() !== (current && current.textContent)) {
+          saveSchedule(row, { id: id, schedule: custom.value });
+        }
+      };
+
+      row.querySelector(".rr-toggle").onclick = function () {
+        var job = SCHEDULES.filter(function (j) { return j.id === id; })[0];
+        saveSchedule(row, { id: id, enabled: !(job && job.enabled) });
+      };
+    });
+  }
+
   /* ----------------------------------------------------- global keys */
 
   document.addEventListener("keydown", function (e) {
@@ -1570,6 +1933,7 @@
         done = true; clearTimeout(timer);
         if (d && d.live && d.tickets && d.tickets.length) {
           adopt(d.tickets);
+          SCHEDULES = d.schedules || [];
           live = true;
           state.ticket = null;
           render();

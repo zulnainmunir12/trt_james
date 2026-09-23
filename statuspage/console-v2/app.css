@@ -1169,7 +1169,6 @@ tbody tr:last-child td { border-bottom: none; }
    author rule beats the browser's own [hidden] { display: none }. Without this
    the sign-in screen and the command palette are painted on every page load
    and toggling .hidden from script does nothing. Hidden means hidden. */
-[hidden] { display: none !important; }
 
 /* Which data is on screen. A console quietly showing invented tickets while
    looking live is the worst outcome, so it is stated, not implied. */
@@ -1188,3 +1187,148 @@ tbody tr:last-child td { border-bottom: none; }
 .srcbadge.demo { background: var(--warn-bg); border-color: transparent; color: var(--warn); }
 .srcbadge.demo::before { background: var(--warn); }
 @media (max-width: 760px) { .srcbadge { display: none; } }
+
+/* ===================================================================
+   DRAG AND DROP
+   =================================================================== */
+
+/* Only draggable when the board is showing live data. Dragging a sample
+   ticket would appear to work and then silently do nothing. */
+.board.live .ticket { cursor: grab; }
+.board.live .ticket:active { cursor: grabbing; }
+
+.ticket.dragging {
+  opacity: .45;
+  transform: scale(.98);
+}
+
+/* The column being hovered over. A dashed inset rather than a colour wash,
+   so the cards underneath stay readable while deciding where to drop. */
+.col.drop {
+  border-color: var(--blue);
+  background: var(--tint);
+}
+.col.drop .col-body::after {
+  content: "";
+  display: block;
+  height: 54px;
+  margin: 4px;
+  border: 2px dashed var(--blue);
+  border-radius: var(--r);
+  opacity: .6;
+}
+
+/* Saving, and the two outcomes. Kept on the card itself so the feedback is
+   where the eye already is. */
+.ticket.saving { opacity: .6; pointer-events: none; }
+.ticket.saved  { animation: savedFlash .9s ease; }
+.ticket.failed { animation: failedFlash 1.4s ease; }
+
+@keyframes savedFlash {
+  0%   { box-shadow: 0 0 0 2px var(--ok); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+@keyframes failedFlash {
+  0%, 60% { box-shadow: 0 0 0 2px var(--held); }
+  100%    { box-shadow: 0 0 0 2px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket.saved, .ticket.failed { animation: none; }
+  .ticket.dragging { transform: none; }
+}
+
+/* A card cannot be dragged on a touch screen, so the detail view carries a
+   status control too - that is the only way to move work on a phone. */
+.st-picker { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px; }
+.st-opt {
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); font-family: var(--display);
+  font-size: 12.5px; font-weight: 600; color: var(--dim);
+  transition: border-color .15s, background .15s, color .15s;
+}
+.st-opt:hover { border-color: var(--blue); color: var(--ink); }
+.st-opt[aria-pressed="true"] {
+  background: var(--deep); border-color: transparent; color: #fff;
+}
+.st-note { font-size: 11.5px; color: var(--dimmer); margin-top: 7px; }
+
+/* A failed write has to say so somewhere the eye will land. */
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 400; max-width: min(520px, calc(100vw - 32px));
+  background: var(--navy-800); color: var(--nav-ink);
+  font-size: 13px; line-height: 1.45; padding: 12px 16px;
+  border-radius: 12px; box-shadow: var(--shadow-3);
+  animation: toastIn .22s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
+
+
+/* ---- target date on the new-ticket form ---- */
+.date-row { display: flex; align-items: center; gap: 9px; }
+.date-row input[type="date"] { flex: 1; }
+.quick-dates { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip-date {
+  padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 12px; color: var(--dim);
+  transition: border-color .15s, background .15s, color .15s;
+}
+.chip-date:hover { border-color: var(--blue); background: var(--tint); color: var(--ink); }
+
+
+/* ---- editable routines on the Schedule tab ---- */
+/* `.card` carries no padding in this stylesheet - every other one sets it
+   inline. Without it the text sat flush against the rounded edge and
+   overflow:hidden shaved the first letter off "When these run". */
+.routines-card { margin-bottom: 14px; padding: 18px 20px 6px; }
+.rr-intro { font-size: 12.8px; color: var(--dim); margin: 2px 0 14px; line-height: 1.5; }
+
+.routine-row {
+  display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px 14px;
+  align-items: center;
+  padding: 14px 0; border-top: 1px solid var(--line);
+}
+.routine-row:first-of-type { border-top: 0; }
+.routine-row.saving { opacity: .55; pointer-events: none; }
+.rr-main { min-width: 0; }
+.rr-name { font-family: var(--display); font-size: 13.6px; font-weight: 700;
+           display: flex; align-items: center; gap: 8px; }
+.rr-off { font-family: var(--body); font-size: 10.5px; font-weight: 600;
+          padding: 2px 8px; border-radius: 999px;
+          background: var(--warn-bg); color: var(--warn); }
+.rr-blurb { font-size: 12.4px; color: var(--dim); margin-top: 3px; line-height: 1.5; }
+
+.rr-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rr-preset, .rr-custom {
+  padding: 7px 11px; border: 1px solid var(--line); border-radius: 10px;
+  font-family: var(--body); font-size: 12.8px; background: var(--surface);
+  color: var(--ink);
+}
+.rr-preset { appearance: none; cursor: pointer; padding-right: 28px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7d92' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center; background-size: 14px; }
+.rr-custom { width: 170px; font-family: var(--mono); font-size: 12px; }
+.rr-preset:focus, .rr-custom:focus {
+  outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--tint); }
+
+.rr-now { grid-column: 1 / -1; font-size: 11.8px; color: var(--dimmer); }
+/* This holds prose now, not a cron expression - monospace made it read as
+   code sitting in the middle of a sentence. */
+.rr-now b { font-family: var(--display); color: var(--ink-2); font-weight: 700; }
+
+@media (max-width: 720px) {
+  .routine-row { grid-template-columns: 1fr; }
+  .rr-custom { width: 100%; }
+}
+
+
+/* The raw expression stays available but out of the way - it is for
+   checking, not for reading. */
+.rr-raw {
+  font-family: var(--mono); font-size: 10.5px; color: var(--dimmer);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 1px 6px; margin-left: 8px; white-space: nowrap;
+}
+
+[hidden] { display: none !important; }
