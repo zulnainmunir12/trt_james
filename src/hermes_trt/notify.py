@@ -39,9 +39,30 @@ def fallback_log() -> Path:
     )
 
 
+def _from_env_file(name: str) -> str:
+    """Read a key from Hermes' env file.
+
+    The environment is checked first so a caller can override, but the file
+    has to be read too: cron runners exec Python directly and nothing loads
+    .env into the process. Without this, every scheduled escalation saw an
+    empty target and fell back to the log file - the sweep ran daily and
+    nobody was ever told. The same pattern is in slackpoll and jev.
+    """
+    env_file = Path(
+        os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / ".env"
+    if not env_file.exists():
+        return ""
+    found = ""
+    for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        if line.startswith(f"{name}="):
+            found = line.split("=", 1)[1].strip().strip("'\"")
+    return found
+
+
 def escalation_target() -> str:
-    """Set once the client gives us a Slack channel. Until then, empty."""
-    return os.environ.get("HERMES_TRT_ESCALATION_TARGET", "")
+    """Where escalations go. Empty until a channel is configured."""
+    return (os.environ.get("HERMES_TRT_ESCALATION_TARGET", "")
+            or _from_env_file("HERMES_TRT_ESCALATION_TARGET"))
 
 
 @dataclass

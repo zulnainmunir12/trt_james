@@ -19,7 +19,16 @@ from hermes_trt import notify  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    """Keep every test off the real config and the real alert log."""
+    """Keep every test off the real config and the real alert log.
+
+    HERMES_HOME matters as much as the env var: escalation_target() falls
+    back to reading ~/.hermes/.env, because cron runners exec Python
+    directly and nothing loads that file into the environment. Without
+    pointing HOME somewhere empty, these tests would read the machine's
+    real configuration - and on a configured machine, post to the clinic's
+    Slack channel.
+    """
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
     monkeypatch.setenv("HERMES_TRT_ALERT_LOG", str(tmp_path / "alerts.log"))
     monkeypatch.delenv("HERMES_TRT_ESCALATION_TARGET", raising=False)
 
@@ -91,3 +100,33 @@ def test_config_is_read_at_call_time(monkeypatch):
     assert notify.escalation_target() == ""
     monkeypatch.setenv("HERMES_TRT_ESCALATION_TARGET", "slack:C999")
     assert notify.escalation_target() == "slack:C999"
+
+
+def test_target_is_read_from_the_env_file_when_not_in_the_environment(tmp_path,
+                                                                     monkeypatch):
+    """Cron runners exec Python directly, so nothing loads .env into the
+    process. Reading only os.environ meant every scheduled escalation saw an
+    empty target and fell back to a log file that nobody reads - the sweep
+    ran daily and no one was ever told."""
+    home = tmp_path / "hermes-home"
+    home.mkdir()
+    (home / ".env").write_text(
+        "# a commented template line must not win\n"
+        "# HERMES_TRT_ESCALATION_TARGET=\n"
+        "HERMES_TRT_ESCALATION_TARGET=slack:C0DEADBEEF\n",
+        encoding="utf-8")
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.delenv("HERMES_TRT_ESCALATION_TARGET", raising=False)
+
+    assert notify.escalation_target() == "slack:C0DEADBEEF"
+
+
+def test_the_environment_still_wins_over_the_file(tmp_path, monkeypatch):
+    home = tmp_path / "hermes-home"
+    home.mkdir()
+    (home / ".env").write_text(
+        "HERMES_TRT_ESCALATION_TARGET=slack:CFROMFILE\n", encoding="utf-8")
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_TRT_ESCALATION_TARGET", "slack:CFROMENV")
+
+    assert notify.escalation_target() == "slack:CFROMENV"

@@ -9,6 +9,8 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from hermes_trt.sla import (  # noqa: E402
@@ -22,6 +24,26 @@ from hermes_trt.sla_check import run  # noqa: E402
 from hermes_trt.store import DeadlineStore  # noqa: E402
 
 START = date(2026, 1, 1)
+
+
+@pytest.fixture(autouse=True)
+def _never_touch_live_state(tmp_path, monkeypatch):
+    """Keep every test in this file away from the real system.
+
+    The sweep sends a real alert unless told otherwise, and `send_alert`
+    falls back to writing the caller's own ~/.hermes/trt-alerts.log. Running
+    this suite on a server created that directory and filled it with
+    escalations for the fixture client. Worse, now that the escalation
+    target is read from .env rather than only the environment, an
+    unguarded test on a configured machine would post fixture alerts into
+    the clinic's real Slack channel.
+
+    Applied to the whole file rather than per test, so a new test cannot
+    reintroduce the leak by forgetting.
+    """
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("HERMES_TRT_ALERT_LOG", str(tmp_path / "alerts.log"))
+    monkeypatch.delenv("HERMES_TRT_ESCALATION_TARGET", raising=False)
 
 
 def make(rule_key="followup_bloods", ticket="t_1", trigger=START, **kw):
@@ -231,13 +253,16 @@ def test_dry_run_records_nothing(tmp_path):
 
 
 def test_sweep_separates_due_soon_from_overdue(tmp_path):
+    # notify=False: without it this performs a REAL send_alert. The autouse
+    # fixture above keeps that off live state, but a sweep test has no
+    # business exercising delivery at all - that belongs in test_notify.
     store = DeadlineStore(tmp_path / "sla.db")
     # t_overdue: started 1 Jan, due 26 Feb - 3 days past on 1 March.
     store.add(make(ticket="t_overdue"))
     # t_soon: started 13 Jan, due 10 March - inside the 14-day window on
     # 1 March, but not yet late.
     store.add(make(ticket="t_soon", trigger=date(2026, 1, 13)))
-    report, _ = run(store, date(2026, 3, 1))
+    report, _ = run(store, date(2026, 3, 1), notify=False)
     assert "OVERDUE (1)" in report
     assert "Due soon (1)" in report
 
