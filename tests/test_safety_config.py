@@ -120,3 +120,50 @@ def test_config_records_why_dispatch_is_off():
         "the kanban block must carry the safety note explaining why "
         "autonomous dispatch is disabled"
     )
+
+
+def test_review_dispatch_is_disabled():
+    """The third dispatch switch, and the one nobody could explain.
+
+    review_dispatch ships true, sits in the same kanban block as the two
+    flags that let a worker be spawned against a triaged clinical ticket,
+    and is not listed by `hermes config list`. The incident report left it
+    open: "its behaviour is not understood and it may be another autonomous
+    path."
+
+    An undocumented dispatch switch in a clinical deployment is off until
+    someone can say what it does. If turning it off breaks something
+    visible, that finally tells us what it was for - which is more than we
+    know now.
+    """
+    assert setting("review_dispatch") == "false", (
+        "kanban.review_dispatch must be false. It is undocumented and may "
+        "be a third autonomous path - see docs/INCIDENT-auto-decomposer.md. "
+        "Run setup/disable-auto-orchestration.sh."
+    )
+
+
+def test_every_profile_has_review_dispatch_disabled():
+    """Same reasoning, per profile.
+
+    The top-level config being safe means nothing if a role profile still
+    carries the flag - each profile is an assignee on the board, so each is
+    a live path of its own. This is the gap that let the original incident
+    survive a config that looked correct.
+    """
+    profiles = sorted((CONFIG.parent / "profiles").glob("*/config.yaml"))
+    if not profiles:
+        pytest.skip("no role profiles installed")
+
+    unsafe = []
+    for profile in profiles:
+        text = profile.read_text(encoding="utf-8")
+        found = re.search(r"review_dispatch:\s*(\w+)", text)
+        if not found or found.group(1) != "false":
+            unsafe.append(f"{profile.parent.name}="
+                          f"{found.group(1) if found else 'UNSET'}")
+
+    assert not unsafe, (
+        "These profiles still have review_dispatch enabled: "
+        + "; ".join(unsafe)
+    )

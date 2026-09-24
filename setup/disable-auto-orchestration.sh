@@ -23,6 +23,7 @@
 set -uo pipefail
 HERMES="$HOME/.local/bin/hermes"
 CONFIG="$HOME/.hermes/config.yaml"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "==> current kanban orchestration settings"
 grep -n -A12 '^kanban:' "$CONFIG" | head -20 || echo "  (no kanban block found)"
@@ -45,6 +46,7 @@ block = (
     "  # docs/INCIDENT-auto-decomposer.md\n"
     "  dispatch_in_gateway: false\n"
     "  auto_decompose: false\n"
+    "  review_dispatch: false\n"
 )
 
 if re.search(r"^kanban:", text, re.MULTILINE):
@@ -53,6 +55,14 @@ if re.search(r"^kanban:", text, re.MULTILINE):
                   r"\g<1>dispatch_in_gateway: false", text, flags=re.MULTILINE)
     text = re.sub(r"^(\s*)auto_decompose:\s*\w+",
                   r"\g<1>auto_decompose: false", text, flags=re.MULTILINE)
+    # review_dispatch ships true and sits in the same block as the two
+    # flags above. Hermes does not document it and `hermes config list`
+    # does not show it, so what it dispatches is unknown. An undocumented
+    # dispatch switch beside two that spawned a clinical worker gets turned
+    # off until someone can say what it does. Reversible: a .bak is written
+    # above, and turning it back on is one edit.
+    text = re.sub(r"^(\s*)review_dispatch:\s*\w+",
+                  r"\g<1>review_dispatch: false", text, flags=re.MULTILINE)
     if "dispatch_in_gateway" not in text:
         text = re.sub(r"^kanban:\n", block, text, count=1, flags=re.MULTILINE)
 else:
@@ -64,7 +74,18 @@ PYEOF
 
 echo
 echo "==> verifying"
-grep -n -E "dispatch_in_gateway|auto_decompose" "$CONFIG" | head -6
+grep -n -E "dispatch_in_gateway|auto_decompose|review_dispatch" "$CONFIG" | head -8
+
+echo
+echo "==> the same flags in every role profile"
+# Each profile is an assignee on the board. A flag left true in one profile
+# is a live path no matter what the top-level config says.
+for pc in "$HOME"/.hermes/profiles/*/config.yaml; do
+    [ -e "$pc" ] || continue
+    python3 "$REPO/setup/_force_flags_false.py" "$pc"
+    printf '    %-12s %s of 3 disabled\n' "$(basename "$(dirname "$pc")")" \
+        "$(grep -cE '(dispatch_in_gateway|auto_decompose|review_dispatch): false' "$pc")"
+done
 
 echo
 echo "==> restart the gateway for this to take effect:"
